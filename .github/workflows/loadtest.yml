@@ -1,0 +1,28 @@
+# Kézzel indítható terheléspróba (G4/G5): 300 virtuális szavazó az éles címen.
+# Indítás: GitHub → Actions → "Terheléspróba" → Run workflow.
+name: Terheléspróba
+
+on:
+  workflow_dispatch:
+    inputs:
+      voters:
+        description: Virtuális szavazók száma
+        default: '300'
+      window_s:
+        description: Időablak (mp)
+        default: '60'
+
+jobs:
+  loadtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Terheléspróba futtatása
+        env:
+          BASE_URL: https://s2vote.vercel.app
+          GATE_CODE: ${{ secrets.GATE_CODE }}
+        run: node scripts/loadtest.mjs "${{ inputs.voters }}" "${{ inputs.window_s }}"
