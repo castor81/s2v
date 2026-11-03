@@ -44,7 +44,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .maybeSingle();
     alreadyVoted = Boolean(session?.voted_at);
 
-    return send(res, 200, { title: poll.title, options: poll.options, status, alreadyVoted });
+    return send(res, 200, {
+      title: poll.title,
+      options: poll.options,
+      status,
+      alreadyVoted,
+      opensAt: poll.opens_at,
+      closesAt: poll.closes_at,
+    });
   } catch (e) {
     console.error('open failed', e);
     return send(res, 500, { error: 'server_error' });

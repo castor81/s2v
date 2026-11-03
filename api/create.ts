@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, guard, requireEnv, send } from './_lib/http.js';
 import { generateSlug, generateToken, safeEqual, sha256Hex } from './_lib/crypto.js';
-import { validateCreate } from './_lib/validate.js';
+import { validateCreate, validateSchedule } from './_lib/validate.js';
 
-// POST /api/create  { gateCode, title: {hu,en}, options: [{hu,en}, ...] }
+// POST /api/create  { gateCode, title: {hu,en}, options: [{hu,en}, ...], opensAt?, closesAt? }
 // → { slug, voteUrl, organizerUrl }   (a szervezői link csak most jelenik meg, később nem kérhető le)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // A belépési kód találgatása ellen szigorúbb korlát (kérés/perc/IP).
@@ -19,6 +19,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = validateCreate(body);
     if (!parsed.ok) return send(res, 400, { error: parsed.error });
 
+    // Időzítés (opcionális): a nyitás akár hetekkel előre is megadható; üresen azonnal nyílik.
+    const schedule = validateSchedule(body as Record<string, unknown>);
+    if (!schedule.ok) return send(res, 400, { error: schedule.error });
+
     const baseUrl = requireEnv('BASE_URL').replace(/\/+$/, '');
     const token = generateToken();
     const tokenHash = sha256Hex(token);
@@ -31,6 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         title: parsed.value.title,
         options: parsed.value.options,
         status: 'open',
+        opens_at: schedule.value.opensAt,
+        closes_at: schedule.value.closesAt,
         organizer_token_hash: tokenHash,
       });
       if (!error) {

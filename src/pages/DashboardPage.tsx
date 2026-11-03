@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { pick, useLang, type Localized, type MessageKey } from '../i18n';
 import { post } from '../lib/api';
+import { rankOptions } from '../lib/ranking';
+import { formatDateTime } from '../lib/time';
 import { QrBlock } from '../components/QrBlock';
 import { CopyField } from '../components/CopyField';
+import { EditPanel } from '../components/EditPanel';
 
 type Status = 'upcoming' | 'open' | 'closed';
 
@@ -13,6 +16,8 @@ interface Results {
   title: Localized;
   options: { id: string; hu?: string; en?: string }[];
   status: Status;
+  opensAt: string | null;
+  closesAt: string | null;
   stats: {
     sessions: number;
     votes: number;
@@ -28,7 +33,8 @@ const STATUS_KEY: Record<Status, MessageKey> = {
   upcoming: 'statusUpcoming',
 };
 
-const REFRESH_MS = 5000;
+const REFRESH_MS = 3000;
+const MOVE_MS = 500;
 
 export function DashboardPage() {
   const { token = '' } = useParams();
@@ -38,9 +44,12 @@ export function DashboardPage() {
   const [loadError, setLoadError] = useState(false);
   const [statusError, setStatusError] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [updated, setUpdated] = useState<Date | null>(null);
   const statusRef = useRef<Status | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+  const prevTops = useRef(new Map<string, number>());
 
   // A szervezői hivatkozás titkot tartalmaz: keresők ne indexeljék.
   useEffect(() => {
@@ -70,12 +79,31 @@ export function DashboardPage() {
 
   useEffect(() => {
     void load();
-    // Csak nyitott szavazásnál és látható lapnál frissítünk (kvóta- és akkumulátor-kímélés).
+    // Nyitott vagy induló szavazásnál és látható lapnál frissítünk (kvóta- és akkumulátor-kímélés).
+    // A még nem induló szavazás is frissül, hogy a nyitás pillanatában az állapot átforduljon.
     const id = setInterval(() => {
       if (document.visibilityState === 'visible' && statusRef.current !== 'closed') void load();
     }, REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
+
+  // Élő átrendeződés (FLIP): a sorok a régi helyükről csúsznak az újra; csökkentett mozgás beállításnál nincs animáció.
+  useLayoutEffect(() => {
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const next = new Map<string, number>();
+    rowRefs.current.forEach((el, id) => {
+      const top = el.offsetTop;
+      next.set(id, top);
+      const before = prevTops.current.get(id);
+      if (reduce || before === undefined || before === top) return;
+      el.style.transition = 'none';
+      el.style.transform = `translateY(${before - top}px)`;
+      void el.offsetHeight; // kényszerített újraszámolás: a kezdőállapot rögzül
+      el.style.transition = `transform ${MOVE_MS}ms ease`;
+      el.style.transform = '';
+    });
+    prevTops.current = next;
+  }, [data]);
 
   async function changeStatus(action: 'open' | 'close') {
     setBusy(true);
@@ -113,6 +141,9 @@ export function DashboardPage() {
   const pct = (n: number) => `${nf.format(n * 100)} %`;
   const { stats } = data;
   const title = pick(data.title, lang);
+  const ranked = rankOptions(data.options, stats.counts);
+  const leader = stats.votes > 0 ? ranked[0] : undefined;
+  const leaderText = leader ? `${t('leaderAnnounce')} ${pick(leader.item, lang)}` : '';
 
   return (
     <>
@@ -120,6 +151,21 @@ export function DashboardPage() {
       <p>
         {t('statusLabel')}: <span className={`badge ${data.status}`}>{t(STATUS_KEY[data.status])}</span>
       </p>
+      {(data.opensAt || data.closesAt) && (
+        <p className="schedule">
+          {data.opensAt && (
+            <>
+              {t('scheduleOpens')}: {formatDateTime(data.opensAt, lang)}
+              <br />
+            </>
+          )}
+          {data.closesAt && (
+            <>
+              {t('scheduleCloses')}: {formatDateTime(data.closesAt, lang)}
+            </>
+          )}
+        </p>
+      )}
 
       <div className="section">
         {data.status === 'closed' ? (
@@ -139,9 +185,16 @@ export function DashboardPage() {
             </div>
           </div>
         ) : (
-          <button type="button" className="button" onClick={() => setConfirmClose(true)}>
-            {t('closePoll')}
-          </button>
+          <div className="row">
+            <button type="button" className="button" onClick={() => setConfirmClose(true)}>
+              {t('closePoll')}
+            </button>
+            {!editing && (
+              <button type="button" className="button" onClick={() => setEditing(true)}>
+                {data.status === 'upcoming' ? t('editBtn') : t('editClosesBtn')}
+              </button>
+            )}
+          </div>
         )}
         {statusError && (
           <p role="alert" className="error">
@@ -149,6 +202,22 @@ export function DashboardPage() {
           </p>
         )}
       </div>
+
+      {editing && data.status !== 'closed' && (
+        <EditPanel
+          token={token}
+          status={data.status}
+          title={data.title}
+          options={data.options}
+          opensAt={data.opensAt}
+          closesAt={data.closesAt}
+          onSaved={() => {
+            setEditing(false);
+            void load();
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
 
       <dl className="stats">
         <div className="stat">
@@ -173,22 +242,36 @@ export function DashboardPage() {
         </div>
       </dl>
 
+      {/* Képernyőolvasónak: csak az élen álló változásakor szól (nem minden szavazatnál) */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {leaderText}
+      </p>
+
       <table className="results">
         <caption>{t('resultsHeading')}</caption>
         <thead>
           <tr>
+            <th scope="col" className="rank">
+              {t('colRank')}
+            </th>
             <th scope="col">{t('colOption')}</th>
             <th scope="col">{t('colVotes')}</th>
             <th scope="col">{t('colShare')}</th>
           </tr>
         </thead>
         <tbody>
-          {data.options.map((o) => {
-            const count = stats.counts[o.id] ?? 0;
+          {ranked.map(({ item, count, rank }) => {
             const share = stats.votes > 0 ? count / stats.votes : 0;
             return (
-              <tr key={o.id}>
-                <th scope="row">{pick(o, lang)}</th>
+              <tr
+                key={item.id}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(item.id, el);
+                  else rowRefs.current.delete(item.id);
+                }}
+              >
+                <td className="num rank">{rank}.</td>
+                <th scope="row">{pick(item, lang)}</th>
                 <td className="num">{count}</td>
                 <td>
                   <div className="num">{pct(share)}</div>

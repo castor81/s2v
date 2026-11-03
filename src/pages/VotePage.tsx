@@ -3,12 +3,15 @@ import { useParams } from 'react-router-dom';
 import { pick, useLang, type Localized, type MessageKey } from '../i18n';
 import { errorCode, post } from '../lib/api';
 import { getDeviceId } from '../lib/device';
+import { formatDateTime } from '../lib/time';
 
 interface PollView {
   title: Localized;
   options: Array<{ id: string } & Localized>;
   status: 'upcoming' | 'open' | 'closed';
   alreadyVoted: boolean;
+  opensAt: string | null;
+  closesAt: string | null;
 }
 
 type State =
@@ -24,10 +27,12 @@ export function VotePage() {
   const [choice, setChoice] = useState('');
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<MessageKey | ''>('');
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setState({ kind: 'loading' });
+    // Újratöltéskor (nyitás pillanatában) nem villantjuk vissza a betöltés-képernyőt.
+    if (reload === 0) setState({ kind: 'loading' });
     post<PollView>('/api/open', { slug, deviceId: getDeviceId() }).then((r) => {
       if (cancelled) return;
       if (r.ok) {
@@ -42,7 +47,18 @@ export function VotePage() {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, reload]);
+
+  // Induló szavazásnál a nyitás pillanatában automatikusan újratöltünk. A véletlen késleltetés (0–8 mp)
+  // szétteríti a terhelést, hogy a terem összes telefonja ne ugyanabban a másodpercben kérdezzen.
+  const opensAt = state.kind === 'ready' && state.poll.status === 'upcoming' ? state.poll.opensAt : null;
+  useEffect(() => {
+    if (!opensAt) return;
+    const wait = Math.max(0, Date.parse(opensAt) - Date.now()) + Math.random() * 8000;
+    // A setTimeout felső korlátja ~24 nap: hosszú várakozásnál 6 óránként újraértékelünk.
+    const id = setTimeout(() => setReload((n) => n + 1), Math.min(wait, 6 * 3600 * 1000));
+    return () => clearTimeout(id);
+  }, [opensAt, reload]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -95,7 +111,11 @@ export function VotePage() {
       <>
         <h1>{title}</h1>
         <p role="status" className="notice">
-          {poll.status === 'upcoming' ? t('upcoming') : t('closed')}
+          {poll.status === 'upcoming'
+            ? poll.opensAt
+              ? `${t('upcomingAt')} ${formatDateTime(poll.opensAt, lang)}`
+              : t('upcoming')
+            : t('closed')}
         </p>
       </>
     );
@@ -107,6 +127,11 @@ export function VotePage() {
         <legend>
           <h1>{title}</h1>
           <span className="hint">{t('voteChoose')}</span>
+          {poll.closesAt && (
+            <span className="hint">
+              {t('closesAtVote')} {formatDateTime(poll.closesAt, lang)}
+            </span>
+          )}
         </legend>
         {poll.options.map((o) => (
           <label key={o.id} className="choice">

@@ -53,6 +53,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status: effectiveStatus(poll),
       createdAt: poll.created_at,
       closedAt: poll.closed_at,
+      opensAt: poll.opens_at,
+      closesAt: poll.closes_at,
       stats,
     });
   } catch (e) {
