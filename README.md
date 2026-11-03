@@ -28,7 +28,7 @@ docs/           changelog
 
 1. **Supabase:** hozzon létre egy fejlesztői projektet, majd futtassa a `supabase/migrations/0001_init.sql` fájlt (SQL Editor, vagy `supabase db push`). Éles példányhoz külön projekt kell.
 2. **Környezeti változók:** `.env.example` → `.env.local` (helyben), illetve Vercel → Project Settings → Environment Variables. A `SUPABASE_SERVICE_ROLE_KEY` és a `CREATE_GATE_CODE` titok, a kliensbe nem kerülhet.
-3. **Vercel:** importálja a repót `s2v` néven (cím: `s2v.vercel.app`); a `BASE_URL` legyen `https://s2v.vercel.app`.
+3. **Vercel:** importálja a repót `s2v` néven, a projekthez vegye fel az `s2vote.vercel.app` domaint; a `BASE_URL` legyen `https://s2vote.vercel.app`. A `SUPABASE_SERVICE_ROLE_KEY` Production és Preview környezetben is legyen beállítva (Sensitive). A függvények régiója `fra1` (az adatbázis is EU-ban van).
 4. **Helyi futtatás:** `npm install`, majd `vercel dev` (az `/api` függvényekkel együtt; a sima `npm run dev` csak a klienst indítja).
 
 ## Parancsok
@@ -37,7 +37,7 @@ docs/           changelog
 npm run typecheck   típusellenőrzés
 npm test            segédfüggvények tesztje
 npm run build       típusellenőrzés + produkciós build
-BASE_URL=https://s2v.vercel.app GATE_CODE=... npm run loadtest   # 300 szavazó 60 mp alatt
+BASE_URL=https://s2vote.vercel.app GATE_CODE=... npm run loadtest   # 300 szavazó 60 mp alatt
 ```
 
 ## Ismert korlátok (tudatosan vállalt, lásd G2 K1)

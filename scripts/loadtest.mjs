@@ -1,6 +1,6 @@
 // Terheléspróba: 1 szavazás létrehozása, majd N virtuális szavazó (alapértelmezés: 300),
 // akik egy időablakban (alapértelmezés: 60 mp) megnyitják az oldalt és szavaznak.
-// Futtatás:  BASE_URL=https://s2v.vercel.app GATE_CODE=... node scripts/loadtest.mjs [N] [ablak_mp]
+// Futtatás:  BASE_URL=https://s2vote.vercel.app GATE_CODE=... node scripts/loadtest.mjs [N] [ablak_mp]
 // Fontos: egyetlen IP-ről fut; a szerver oldali IP-korlát (RATE_LIMIT_PER_MIN) alatt kell maradnia.
 import { randomBytes } from 'node:crypto';
 
