@@ -2,7 +2,7 @@
 
 QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokumentáció: projektprofil v1.0, G2 követelmény-alapvonal v1.1, G3 architektúra v1.1.
 
-**Állapot:** 1. iteráció váza (v0.1.0) · 2026-11-03
+**Állapot:** 2. iteráció, 2. rész (v0.2.1) · 2026-11-03
 
 ## Mi van benne (1. iteráció)
 
@@ -10,17 +10,19 @@ QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokument
 - QR-generátor (PNG/SVG letöltés) és a szöveges rövid cím a kód alatt
 - szavazóoldal (`/<slug>`), egyválasztós, magyar/angol felület
 - eszközönként egy szavazat szavazásonként (adatbázis-megszorítás)
-- szervezői token generálása (csak a hash-e tárolódik); a dashboard (`/o/<token>`) a 2. iterációban készül
+- szervezői token generálása (csak a hash-e tárolódik)
+- szervezői felület (`/o/<token>`): eredmények, mérőszámok, lezárás/újranyitás, QR újranyomtatás
 - terheléspróba-szkript (300 szavazó)
 
 ## Szerkezet
 
 ```
-api/            Vercel Functions (Node/TS): create, open, vote  +  _lib (crypto, validáció, http)
+api/            Vercel Functions (Node/TS): create, open, vote, results, status  +  _lib (crypto, validáció, statisztika, http)
 src/            React + Vite + TS kliens (titkot nem tartalmaz)
+public/brand/   NKE HHK és NKE logó, átlátszó háttérminta (arculati kézikönyv)
 supabase/       migrations/0001_init.sql (polls, poll_sessions, votes; RLS zárva)
 scripts/        loadtest.mjs
-tests/          api-lib.test.ts (segédfüggvények)
+tests/          api-lib.test.ts, stats.test.ts
 docs/           changelog
 ```
 
@@ -44,4 +46,4 @@ BASE_URL=https://s2vote.vercel.app GATE_CODE=... npm run loadtest   # 300 szavaz
 
 - Az eszközazonosító a böngésző tárhelyében él; törlésével újra lehet szavazni. Tét nélküli szavazásnál elfogadott.
 - Az IP-alapú sebességkorlát példányonkénti (in-memory), és szándékosan magas (alapérték 600/perc), mert rendezvényen sok szavazó lehet ugyanazon a wifi-IP mögött. Ez csak visszaélés elleni alapvédelem; a duplikációt az adatbázis UNIQUE megszorítása akadályozza meg.
-- A lezárás (`closed`) és a 30 napos törlés (`purge_closed_polls`) a 2. iterációban kerül be az n8n és a szervezői felület oldalán.
+- A 30 napos törlés (`purge_closed_polls`) ütemezése (n8n) a 2. iteráció következő részében kerül be.

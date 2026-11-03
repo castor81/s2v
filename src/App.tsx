@@ -34,7 +34,11 @@ export function App() {
     <div className="shell">
       <header className="topbar">
         <Link to="/" className="brand">
-          {t('appName')}
+          <img src="/brand/nke-hhk-logo.png" alt={t('logoAlt')} width={56} height={56} />
+          <span className="brand-text">
+            <span>{t('appName')}</span>
+            <span className="brand-sub">{t('orgName')}</span>
+          </span>
         </Link>
         <div role="group" aria-label={t('language')} className="langswitch">
           {(['hu', 'en'] as const).map((l) => (
@@ -60,6 +64,11 @@ export function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
+      <footer className="footer">
+        {/* Dekoratív: a név szövegként is szerepel mellette */}
+        <img src="/brand/nke-logo.png" alt="" width={48} height={48} />
+        <span>{t('footerText')}</span>
+      </footer>
     </div>
   );
 }
