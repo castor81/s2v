@@ -1,7 +1,8 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import QRCode from 'qrcode';
+import { useState, type FormEvent } from 'react';
 import { useLang, type Localized, type MessageKey } from '../i18n';
 import { errorCode, post } from '../lib/api';
+import { QrBlock } from '../components/QrBlock';
+import { CopyField } from '../components/CopyField';
 
 interface Created {
   slug: string;
@@ -11,70 +12,6 @@ interface Created {
 
 const MIN = 2;
 const MAX = 10;
-
-function download(href: string, filename: string) {
-  const a = document.createElement('a');
-  a.href = href;
-  a.download = filename;
-  a.click();
-}
-
-function QrBlock({ created }: { created: Created }) {
-  const { t } = useLang();
-  const [png, setPng] = useState('');
-
-  useEffect(() => {
-    QRCode.toDataURL(created.voteUrl, { width: 512, margin: 2, errorCorrectionLevel: 'M' }).then(setPng);
-  }, [created.voteUrl]);
-
-  async function saveSvg() {
-    const svg = await QRCode.toString(created.voteUrl, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' });
-    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-    download(url, `s2v-${created.slug}.svg`);
-    URL.revokeObjectURL(url);
-  }
-
-  return (
-    <div className="qr">
-      {png && <img src={png} alt={t('qrAlt')} width={256} height={256} />}
-      {/* A rövid cím a nyomtatott kód alatt is szerepeljen (hozzáférhetőség) */}
-      <p className="qr-url">{created.voteUrl.replace(/^https?:\/\//, '')}</p>
-      <div className="row">
-        <button type="button" className="button" disabled={!png} onClick={() => download(png, `s2v-${created.slug}.png`)}>
-          {t('downloadPng')}
-        </button>
-        <button type="button" className="button" onClick={saveSvg}>
-          {t('downloadSvg')}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function CopyField({ label, value, id }: { label: string; value: string; id: string }) {
-  const { t } = useLang();
-  const [done, setDone] = useState(false);
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(value);
-      setDone(true);
-      setTimeout(() => setDone(false), 2000);
-    } catch {
-      /* a mező kijelölhető, kézzel is másolható */
-    }
-  }
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <div className="row">
-        <input id={id} readOnly value={value} onFocus={(e) => e.currentTarget.select()} />
-        <button type="button" className="button" onClick={copy}>
-          {done ? t('copied') : t('copy')}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export function CreatePoll() {
   const { t } = useLang();
@@ -110,7 +47,7 @@ export function CreatePoll() {
     return (
       <>
         <h1>{t('resultTitle')}</h1>
-        <QrBlock created={created} />
+        <QrBlock slug={created.slug} voteUrl={created.voteUrl} />
         <CopyField id="vote-url" label={t('voteLink')} value={created.voteUrl} />
         <CopyField id="org-url" label={t('organizerLink')} value={created.organizerUrl} />
         <p role="note" className="notice warn">

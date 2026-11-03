@@ -20,6 +20,12 @@ export const OPTIONS_MAX = 10;
 
 const SLUG_RE = /^[a-z0-9]{6}$/;
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;
+// 32 véletlen bájt base64url kódolásban = 43 karakter (lásd generateToken)
+const TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
+
+export function isToken(v: unknown): v is string {
+  return typeof v === 'string' && TOKEN_RE.test(v);
+}
 
 export function isSlug(v: unknown): v is string {
   return typeof v === 'string' && SLUG_RE.test(v);
