@@ -4,6 +4,7 @@ import { pick, useLang, type Localized, type MessageKey } from '../i18n';
 import { errorCode, post } from '../lib/api';
 import { getDeviceId } from '../lib/device';
 import { formatDateTime } from '../lib/time';
+import { LiveResults } from '../components/LiveResults';
 
 interface PollView {
   title: Localized;
@@ -103,6 +104,7 @@ export function VotePage() {
         <p role="status" className="notice">
           {poll.alreadyVoted ? t('alreadyVoted') : t('thanksTitle')}
         </p>
+        <LiveResults slug={slug} />
       </>
     );
   }

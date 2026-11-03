@@ -107,6 +107,11 @@ const dict = {
     errPollClosed: 'A szavazás le van zárva. Újranyitás után módosítható a zárás időpontja.',
     colRank: '#',
     leaderAnnounce: 'Az élen:',
+    liveHeading: 'Az állás',
+    liveTotal: 'Eddig leadott szavazat',
+    liveHint: 'Az állás 10 másodpercenként frissül.',
+    liveClosed: 'A szavazás lezárult, ez a végeredmény.',
+    liveError: 'Az állást most nem sikerült lekérni. Újrapróbálkozunk.',
   },
   en: {
     appName: 'S2V · Scan2Vote',
@@ -211,6 +216,11 @@ const dict = {
     errPollClosed: 'The poll is closed. Reopen it to change the closing time.',
     colRank: '#',
     leaderAnnounce: 'Leading:',
+    liveHeading: 'Current standings',
+    liveTotal: 'Votes cast so far',
+    liveHint: 'Standings refresh every 10 seconds.',
+    liveClosed: 'The poll is closed; these are the final results.',
+    liveError: 'The standings could not be loaded right now. We will try again.',
   },
 } as const;
 

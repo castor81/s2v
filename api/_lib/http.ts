@@ -16,6 +16,11 @@ export function db(): SupabaseClient {
   return client;
 }
 
+/** Csak teszteléshez: hamis adatbázis-kliens beállítása. */
+export function __setDbForTests(c: unknown): void {
+  client = c as SupabaseClient;
+}
+
 export function send(res: VercelResponse, status: number, body: unknown): void {
   res.status(status).json(body);
 }

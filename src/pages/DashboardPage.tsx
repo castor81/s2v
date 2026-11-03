@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { pick, useLang, type Localized, type MessageKey } from '../i18n';
 import { post } from '../lib/api';
@@ -7,6 +7,7 @@ import { formatDateTime } from '../lib/time';
 import { QrBlock } from '../components/QrBlock';
 import { CopyField } from '../components/CopyField';
 import { EditPanel } from '../components/EditPanel';
+import { ResultsTable } from '../components/ResultsTable';
 
 type Status = 'upcoming' | 'open' | 'closed';
 
@@ -34,7 +35,6 @@ const STATUS_KEY: Record<Status, MessageKey> = {
 };
 
 const REFRESH_MS = 3000;
-const MOVE_MS = 500;
 
 export function DashboardPage() {
   const { token = '' } = useParams();
@@ -48,8 +48,6 @@ export function DashboardPage() {
   const [busy, setBusy] = useState(false);
   const [updated, setUpdated] = useState<Date | null>(null);
   const statusRef = useRef<Status | null>(null);
-  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
-  const prevTops = useRef(new Map<string, number>());
 
   // A szervezői hivatkozás titkot tartalmaz: keresők ne indexeljék.
   useEffect(() => {
@@ -86,24 +84,6 @@ export function DashboardPage() {
     }, REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
-
-  // Élő átrendeződés (FLIP): a sorok a régi helyükről csúsznak az újra; csökkentett mozgás beállításnál nincs animáció.
-  useLayoutEffect(() => {
-    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-    const next = new Map<string, number>();
-    rowRefs.current.forEach((el, id) => {
-      const top = el.offsetTop;
-      next.set(id, top);
-      const before = prevTops.current.get(id);
-      if (reduce || before === undefined || before === top) return;
-      el.style.transition = 'none';
-      el.style.transform = `translateY(${before - top}px)`;
-      void el.offsetHeight; // kényszerített újraszámolás: a kezdőállapot rögzül
-      el.style.transition = `transform ${MOVE_MS}ms ease`;
-      el.style.transform = '';
-    });
-    prevTops.current = next;
-  }, [data]);
 
   async function changeStatus(action: 'open' | 'close') {
     setBusy(true);
@@ -247,44 +227,7 @@ export function DashboardPage() {
         {leaderText}
       </p>
 
-      <table className="results">
-        <caption>{t('resultsHeading')}</caption>
-        <thead>
-          <tr>
-            <th scope="col" className="rank">
-              {t('colRank')}
-            </th>
-            <th scope="col">{t('colOption')}</th>
-            <th scope="col">{t('colVotes')}</th>
-            <th scope="col">{t('colShare')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ranked.map(({ item, count, rank }) => {
-            const share = stats.votes > 0 ? count / stats.votes : 0;
-            return (
-              <tr
-                key={item.id}
-                ref={(el) => {
-                  if (el) rowRefs.current.set(item.id, el);
-                  else rowRefs.current.delete(item.id);
-                }}
-              >
-                <td className="num rank">{rank}.</td>
-                <th scope="row">{pick(item, lang)}</th>
-                <td className="num">{count}</td>
-                <td>
-                  <div className="num">{pct(share)}</div>
-                  {/* A sáv csak szemléltet; az érték számként és szövegként is szerepel */}
-                  <div className="bar" aria-hidden="true">
-                    <span style={{ width: `${share * 100}%` }} />
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <ResultsTable options={data.options} counts={stats.counts} total={stats.votes} />
       {stats.votes === 0 && <p>{t('noVotesYet')}</p>}
 
       <p className="hint">
