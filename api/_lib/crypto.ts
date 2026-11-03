@@ -5,8 +5,8 @@ export const SLUG_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 export const SLUG_LENGTH = 6;
 
 // A slug nem ütközhet rendszerútvonalakkal (/uj, /o/, /api/ rövidebbek 6 karakternél,
-// de a statikus mappa neve igen).
-const RESERVED_SLUGS = new Set(['assets']);
+// de a statikus mappa és a /master felület neve igen).
+const RESERVED_SLUGS = new Set(['assets', 'master']);
 
 export function generateSlug(): string {
   for (;;) {
@@ -37,4 +37,12 @@ export function safeEqual(a: string, b: string): boolean {
   const ha = createHash('sha256').update(a, 'utf8').digest();
   const hb = createHash('sha256').update(b, 'utf8').digest();
   return timingSafeEqual(ha, hb);
+}
+
+// Szerkesztői kód: félreérthető karakterek nélkül, 3×4 jegy kötőjellel (kb. 58 bit).
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+export function generateAccessCode(): string {
+  const group = () => Array.from({ length: 4 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
+  return `${group()}-${group()}-${group()}`;
 }

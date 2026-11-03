@@ -52,6 +52,12 @@ export function rateLimited(req: VercelRequest, scope: string, limitPerMin?: num
   return b.count > limit;
 }
 
+/** Megnézi, hogy a korlát betelt-e, anélkül hogy számolna (sikertelen próbálkozások zárolásához). */
+export function limitReached(req: VercelRequest, scope: string, limitPerMin: number): boolean {
+  const b = buckets.get(`${scope}:${clientIp(req)}`);
+  return Boolean(b && b.resetAt > Date.now() && b.count >= limitPerMin);
+}
+
 /** Közös előfeltételek: csak POST, sebességkorlát. Igaz, ha a kérést már lezártuk. */
 export function guard(req: VercelRequest, res: VercelResponse, scope: string, limit?: number): boolean {
   if (req.method !== 'POST') {

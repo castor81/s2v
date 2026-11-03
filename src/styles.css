@@ -415,3 +415,163 @@ table.results tbody tr {
     transition: none;
   }
 }
+
+/* ---- Master felület (0.5.0) ---- */
+.shell.wide {
+  max-width: 64rem;
+}
+
+select {
+  background: var(--surface);
+  color: var(--fg);
+  min-height: 44px;
+  padding: 8px 10px;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 100%;
+}
+
+input[type='search'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.badge.upcoming {
+  background: var(--warn-bg);
+  border-color: #a15c00;
+  color: #5c3500;
+}
+
+.badge.archived {
+  background: var(--note-bg);
+  border-color: var(--line);
+  color: var(--muted);
+  margin-left: 6px;
+}
+
+.button.danger {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.mtop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.mtabs .button[aria-current='page'] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.mfilters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0 16px;
+  align-items: end;
+}
+
+.mcheck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 12px 0;
+}
+
+.mcheck input {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+.mlist {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+  display: grid;
+  gap: 12px;
+}
+
+.mpoll {
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 16px;
+  background: var(--surface);
+}
+
+.mpoll.open {
+  border-left-color: #14692a;
+}
+
+.mpoll.upcoming {
+  border-left-color: #a15c00;
+}
+
+.mhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mhead h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  flex: 1 1 14rem;
+}
+
+.mmeta {
+  color: var(--muted);
+  margin: 4px 0 10px;
+}
+
+.mdetail {
+  border-top: 1px dashed var(--line);
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.mdetail h4 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.mactions {
+  margin-top: 8px;
+}
+
+.mqr {
+  margin: 12px 0;
+}
+
+.mqr summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.field.grow {
+  flex: 1 1 14rem;
+  margin: 0;
+}
+
+.mform {
+  align-items: flex-end;
+  margin: 12px 0;
+}

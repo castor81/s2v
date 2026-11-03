@@ -2,7 +2,7 @@
 
 QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokumentáció: projektprofil v1.0, G2 követelmény-alapvonal v1.1, G3 architektúra v1.1.
 
-**Állapot:** 2. iteráció, 3. rész (v0.4.0) · 2026-11-03
+**Állapot:** 2. iteráció, 4. rész (v0.5.0) · 2026-11-03
 
 ## Mi van benne (1. iteráció)
 
@@ -49,3 +49,14 @@ BASE_URL=https://s2vote.vercel.app GATE_CODE=... npm run loadtest   # 300 szavaz
 - Az eszközazonosító a böngésző tárhelyében él; törlésével újra lehet szavazni. Tét nélküli szavazásnál elfogadott.
 - Az IP-alapú sebességkorlát példányonkénti (in-memory), és szándékosan magas (alapérték 1500/perc), mert rendezvényen sok szavazó lehet ugyanazon a wifi-IP mögött. Ez csak visszaélés elleni alapvédelem; a duplikációt az adatbázis UNIQUE megszorítása akadályozza meg.
 - A 30 napos törlés (`purge_closed_polls`) ütemezése (n8n) a 2. iteráció következő részében kerül be. A soha le nem zárt, zárási időpont nélküli szavazás nem törlődik automatikusan: érdemes zárási időpontot megadni.
+
+
+## Master felület (v0.5.0)
+
+Cím: `/master` (belépés a `MASTER_CODE` kóddal; a kód csak a böngészőlap munkamenetében marad meg).
+
+- **Szavazások:** futó, betervezett és lezárt szavazások eredményekkel, szűrés (állapot, projekt, keresés), rendezés, archiválás, CSV-export.
+- **Szerkeszthetőség:** a nyitás előtti szavazás teljesen módosítható; a futó szavazás nem (csak lezárható); lezárt újranyitható vagy törölhető. Másolás sablonként, új szervezői hivatkozás elveszett link esetére.
+- **Projektek:** szavazások csoportosítása, projektenkénti export.
+- **Szerkesztői kódok:** tetszőleges számú kód (egyedi vagy generált), projekthez köthető, lejárattal, kikapcsolható; csak a sózott lenyomat tárolódik. Az általános `CREATE_GATE_CODE` továbbra is érvényes.
+- Adatbázis: a `0003_master.sql` az `s2v_projects` és `s2v_access_codes` táblákat hozza létre (a közös KM-dev projektben más alkalmazás is használ `projects` nevű táblát).

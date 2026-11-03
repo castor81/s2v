@@ -2,6 +2,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { __setDbForTests } from '../api/_lib/http.js';
+import { call, makeFakeDb, type Row, type Tables } from './fakedb.js';
 import { generateToken, hashDevice, sha256Hex } from '../api/_lib/crypto.js';
 import create from '../api/create.js';
 import live from '../api/live.js';
@@ -13,80 +14,11 @@ process.env.DEVICE_SALT = 'test-salt';
 process.env.BASE_URL = 'https://example.test';
 process.env.CREATE_GATE_CODE = 'gate-secret';
 
-type Row = Record<string, any>;
-type Tables = Record<string, Row[]>;
-
-class Q implements PromiseLike<any> {
-  private filters: Array<[string, unknown]> = [];
-  private op: 'select' | 'update' | 'insert' = 'select';
-  private patch: Row = {};
-  private count = false;
-  private head = false;
-  constructor(private tables: Tables, private table: string) {}
-  select(_cols?: string, o?: { count?: string; head?: boolean }) {
-    this.count = Boolean(o?.count);
-    this.head = Boolean(o?.head);
-    return this;
-  }
-  eq(c: string, v: unknown) {
-    this.filters.push([c, v]);
-    return this;
-  }
-  range() {
-    return this;
-  }
-  update(p: Row) {
-    this.op = 'update';
-    this.patch = p;
-    return this;
-  }
-  insert(r: Row) {
-    this.op = 'insert';
-    this.patch = r;
-    return this;
-  }
-  maybeSingle() {
-    return Promise.resolve(this.run(true));
-  }
-  then(a?: any, b?: any): any {
-    return Promise.resolve(this.run(false)).then(a, b);
-  }
-  private run(single: boolean) {
-    const rows = (this.tables[this.table] ??= []);
-    if (this.op === 'insert') {
-      rows.push({ id: `${this.table}-${rows.length + 1}`, ...this.patch });
-      return { data: null, error: null };
-    }
-    const match = rows.filter((r) => this.filters.every(([c, v]) => r[c] === v));
-    if (this.op === 'update') match.forEach((r) => Object.assign(r, this.patch));
-    if (this.count && this.head) return { data: null, error: null, count: match.length };
-    return { data: single ? (match[0] ?? null) : match, error: null };
-  }
-}
-
 let tables: Tables;
 beforeEach(() => {
   tables = { polls: [], votes: [], poll_sessions: [] };
-  __setDbForTests({ from: (t: string) => new Q(tables, t) });
+  __setDbForTests(makeFakeDb(tables));
 });
-
-async function call(handler: (req: any, res: any) => unknown, body: unknown) {
-  const res: any = {
-    code: 0,
-    body: undefined,
-    status(c: number) {
-      this.code = c;
-      return this;
-    },
-    json(b: unknown) {
-      this.body = b;
-      return this;
-    },
-    setHeader() {},
-  };
-  await handler({ method: 'POST', body, headers: {}, socket: { remoteAddress: '10.0.0.1' } }, res);
-  return res as { code: number; body: any };
-}
 
 const OPTS = [
   { id: 'o1', hu: 'A' },

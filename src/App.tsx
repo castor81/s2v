@@ -1,8 +1,9 @@
-import { Link, Route, Routes } from 'react-router-dom';
+import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { useLang } from './i18n';
 import { CreatePoll } from './pages/CreatePoll';
 import { VotePage } from './pages/VotePage';
 import { DashboardPage } from './pages/DashboardPage';
+import { MasterPage } from './pages/MasterPage';
 
 function Home() {
   const { t } = useLang();
@@ -30,8 +31,9 @@ function NotFound() {
 
 export function App() {
   const { lang, setLang, t } = useLang();
+  const wide = useLocation().pathname.startsWith('/master');
   return (
-    <div className="shell">
+    <div className={wide ? 'shell wide' : 'shell'}>
       <header className="topbar">
         <Link to="/" className="brand">
           <img src="/brand/nke-hhk-logo.png" alt={t('logoAlt')} width={56} height={56} />
@@ -60,6 +62,7 @@ export function App() {
           <Route path="/" element={<Home />} />
           <Route path="/uj" element={<CreatePoll />} />
           <Route path="/o/:token" element={<DashboardPage />} />
+          <Route path="/master" element={<MasterPage />} />
           <Route path="/:slug" element={<VotePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
