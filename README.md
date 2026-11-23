@@ -2,7 +2,7 @@
 
 QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokumentáció: projektprofil v1.0, G2 követelmény-alapvonal v1.1, G3 architektúra v1.1.
 
-**Állapot:** 2. iteráció, 4. rész (v0.5.0) · 2026-11-03
+**Állapot:** 2. iteráció, 4. rész (v0.5.1) · 2026-11-03
 
 ## Mi van benne (1. iteráció)
 
@@ -51,7 +51,7 @@ BASE_URL=https://s2vote.vercel.app GATE_CODE=... npm run loadtest   # 300 szavaz
 - A 30 napos törlés (`purge_closed_polls`) ütemezése (n8n) a 2. iteráció következő részében kerül be. A soha le nem zárt, zárási időpont nélküli szavazás nem törlődik automatikusan: érdemes zárási időpontot megadni.
 
 
-## Master felület (v0.5.0)
+## Master felület (v0.5.1)
 
 Cím: `/master` (belépés a `MASTER_CODE` kóddal; a kód csak a böngészőlap munkamenetében marad meg).
 

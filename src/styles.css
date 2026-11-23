@@ -575,3 +575,18 @@ input[type='search'] {
   align-items: flex-end;
   margin: 12px 0;
 }
+
+.mselect {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+.mbulk {
+  margin: 8px 0;
+  gap: 12px;
+}
+
+.mbulk .mcheck {
+  margin: 0;
+}

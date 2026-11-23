@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { pick, useLang, type MessageKey } from '../../i18n';
 import { formatDateTime } from '../../lib/time';
 import { exportPolls } from '../../lib/csv';
 import { rankOptions } from '../../lib/ranking';
-import type { Overview, PollStatus } from '../../lib/master';
+import { masterError, masterPost, type Overview, type PollStatus } from '../../lib/master';
 import { PollDetail } from './PollDetail';
 
 interface Props {
@@ -24,6 +24,11 @@ export function PollsTab({ code, data, reload }: Props) {
   const [sort, setSort] = useState<Sort>('created');
   const [archived, setArchived] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Törlés a listából: kijelölés (több szavazás egyszerre) és megerősítés
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const projectName = useMemo(() => new Map(data.projects.map((p) => [p.id, p.name])), [data.projects]);
   const nf = new Intl.NumberFormat(lang === 'hu' ? 'hu-HU' : 'en-GB');
@@ -49,6 +54,67 @@ export function PollsTab({ code, data, reload }: Props) {
     });
     return list;
   }, [data.polls, status, project, query, sort, archived, lang]);
+
+  // A már megszűnt (vagy futóvá vált) szavazások kikerülnek a kijelölésből.
+  useEffect(() => {
+    setSelected((prev) => {
+      const keep = new Set(data.polls.filter((p) => p.status !== 'open' && prev.has(p.id)).map((p) => p.id));
+      return keep.size === prev.size ? prev : keep;
+    });
+  }, [data.polls]);
+
+  const deletable = visible.filter((p) => p.status !== 'open');
+  const allSelected = deletable.length > 0 && deletable.every((p) => selected.has(p.id));
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function deleteIds(ids: string[]) {
+    setBusy(true);
+    setMessage(null);
+    let failed = 0;
+    let running = 0;
+    for (const id of ids) {
+      const r = await masterPost(code, 'poll.delete', { id });
+      if (!r.ok) {
+        failed += 1;
+        if (masterError(r) === 'mErrRunning') running += 1;
+      }
+    }
+    setBusy(false);
+    setConfirmIds(null);
+    setSelected(new Set());
+    if (openId && ids.includes(openId)) setOpenId(null);
+    const done = ids.length - failed;
+    setMessage(
+      failed === 0
+        ? { kind: 'ok', text: `${done} ${t('mDeletedN')}` }
+        : { kind: 'error', text: `${done} ${t('mDeletedN')}, ${failed} ${t('mDeleteFailedN')}${running ? ` (${t('mErrRunning')})` : ''}` },
+    );
+    await reload();
+  }
+
+  const confirmBox = (ids: string[]) => (
+    <div role="alertdialog" aria-label={t('mDeleteConfirm')} className="notice warn">
+      <p>
+        {ids.length > 1 ? `${ids.length} ${t('mBulkDeleteConfirm')}` : t('mDeleteConfirm')}
+      </p>
+      <div className="row">
+        <button type="button" className="button primary" disabled={busy} onClick={() => void deleteIds(ids)}>
+          {busy ? t('saving') : t('mDeleteYes')}
+        </button>
+        <button type="button" className="button" disabled={busy} onClick={() => setConfirmIds(null)}>
+          {t('cancel')}
+        </button>
+      </div>
+    </div>
+  );
 
   const active = data.polls.filter((p) => !p.archivedAt);
   const count = (s: PollStatus) => active.filter((p) => p.status === s).length;
@@ -127,6 +193,38 @@ export function PollsTab({ code, data, reload }: Props) {
         </span>
       </div>
 
+      {deletable.length > 0 && (
+        <div className="row mbulk">
+          <label className="mcheck">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => setSelected(allSelected ? new Set() : new Set(deletable.map((p) => p.id)))}
+            />
+            <span>{t('mSelectAllVisible')}</span>
+          </label>
+          {selected.size > 0 && (
+            <>
+              <span role="status">
+                {selected.size} {t('mSelectedCount')}
+              </span>
+              <button type="button" className="button danger" onClick={() => setConfirmIds([...selected])}>
+                {t('mDeleteSelected')}
+              </button>
+              <button type="button" className="button" onClick={() => setSelected(new Set())}>
+                {t('mClearSelection')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {confirmIds && confirmIds.length > 1 && confirmBox(confirmIds)}
+      {message && (
+        <p role={message.kind === 'error' ? 'alert' : 'status'} className={message.kind === 'error' ? 'error' : 'notice'}>
+          {message.text}
+        </p>
+      )}
+
       {visible.length === 0 ? (
         <p>{t('mNoPolls')}</p>
       ) : (
@@ -137,6 +235,15 @@ export function PollsTab({ code, data, reload }: Props) {
             return (
               <li key={p.id} className={`mpoll ${p.status}`}>
                 <div className="mhead">
+                  {p.status !== 'open' && (
+                    <input
+                      type="checkbox"
+                      className="mselect"
+                      checked={selected.has(p.id)}
+                      onChange={() => toggle(p.id)}
+                      aria-label={`${t('mSelectPoll')}: ${pick(p.title, lang)}`}
+                    />
+                  )}
                   <h3>{pick(p.title, lang)}</h3>
                   <span className={`badge ${p.status}`}>{t(STATUS_KEY[p.status])}</span>
                   {p.archivedAt && <span className="badge archived">{t('mArchived')}</span>}
@@ -149,15 +256,28 @@ export function PollsTab({ code, data, reload }: Props) {
                   {p.status === 'open' && (p.closesAt ? `${t('scheduleCloses')}: ${formatDateTime(p.closesAt, lang)}` : t('mManualClose'))}
                   {p.status === 'closed' && `${t('mClosedAt')}: ${formatDateTime(p.closedAt ?? p.closesAt ?? p.createdAt, lang)}`}
                 </p>
-                <button
-                  type="button"
-                  className="button"
-                  aria-expanded={open}
-                  aria-controls={`m-detail-${p.id}`}
-                  onClick={() => setOpenId(open ? null : p.id)}
-                >
-                  {open ? t('mHideDetails') : t('mShowDetails')}
-                </button>
+                <div className="row">
+                  <button
+                    type="button"
+                    className="button"
+                    aria-expanded={open}
+                    aria-controls={`m-detail-${p.id}`}
+                    onClick={() => setOpenId(open ? null : p.id)}
+                  >
+                    {open ? t('mHideDetails') : t('mShowDetails')}
+                  </button>
+                  {p.status !== 'open' && (
+                    <button
+                      type="button"
+                      className="button danger"
+                      aria-label={`${t('mDelete')}: ${pick(p.title, lang)}`}
+                      onClick={() => setConfirmIds([p.id])}
+                    >
+                      {t('mDelete')}
+                    </button>
+                  )}
+                </div>
+                {confirmIds && confirmIds.length === 1 && confirmIds[0] === p.id && confirmBox(confirmIds)}
                 {open && (
                   <div id={`m-detail-${p.id}`}>
                     <PollDetail
