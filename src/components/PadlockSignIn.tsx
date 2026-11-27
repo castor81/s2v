@@ -107,7 +107,7 @@ export function PadlockSignIn({ onSignedIn }: Props) {
 
       {/* Forgó NKE logó; csökkentett mozgás beállításnál álló kép */}
       <picture>
-        <source media="(prefers-reduced-motion: reduce)" srcSet="/brand/nke-logo.png" />
+        <source media="(prefers-reduced-motion: reduce)" srcSet="/brand/nke-logo-still.png" />
         <img className="signin-logo" src="/brand/nke-logo-spin.gif" alt="" width={112} height={112} />
       </picture>
     </div>

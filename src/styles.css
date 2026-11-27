@@ -925,9 +925,6 @@ input[type='search'] {
 .signin-logo {
   display: block;
   margin: 22px auto 0;
-  border-radius: 50%;
-  background: #ffffff;
-  border: 1px solid var(--line);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,7 +2,7 @@
 
 QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokumentáció: projektprofil v1.0, G2 követelmény-alapvonal v1.1, G3 architektúra v1.1.
 
-**Állapot:** 2. iteráció, 4. rész (v0.6.0) · 2026-11-27
+**Állapot:** 2. iteráció, 4. rész (v0.6.1) · 2026-11-27
 
 ## Mi van benne (1. iteráció)
 
