@@ -74,7 +74,9 @@ test('validateCreate: elutasítja a hibás bemenetet', () => {
   assert.equal(validateCreate(null).ok, false);
   assert.equal(validateCreate({ title: {}, options: opt(2) }).ok, false);
   assert.equal(validateCreate({ title: { hu: 'x' }, options: opt(1) }).ok, false);
-  assert.equal(validateCreate({ title: { hu: 'x' }, options: opt(11) }).ok, false);
+  assert.equal(validateCreate({ title: { hu: 'x' }, options: opt(51) }).ok, false);
+  assert.equal(validateCreate({ title: { hu: "x" }, options: opt(30) }).ok, true);
+  assert.equal(validateCreate({ title: { hu: "x" }, options: opt(50) }).ok, true);
   assert.equal(validateCreate({ title: { hu: 'x'.repeat(121) }, options: opt(2) }).ok, false);
   assert.equal(validateCreate({ title: { hu: 'x' }, options: [{ hu: 'a' }, {}] }).ok, false);
   assert.equal(validateCreate({ title: { hu: 'x' }, options: [{ hu: 'a' }, { hu: 5 }] }).ok, false);

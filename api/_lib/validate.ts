@@ -16,7 +16,7 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 export const TITLE_MAX = 120;
 export const OPTION_MAX = 80;
 export const OPTIONS_MIN = 2;
-export const OPTIONS_MAX = 10;
+export const OPTIONS_MAX = 50;
 
 const SLUG_RE = /^[a-z0-9]{6}$/;
 const DEVICE_RE = /^[A-Za-z0-9_-]{16,64}$/;

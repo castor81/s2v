@@ -3,7 +3,7 @@ import { useLang, type Localized, type MessageKey } from '../i18n';
 import { ImportError, SAMPLE_CSV, parseOptionsFile } from '../lib/importOptions';
 
 const MIN = 2;
-const MAX = 10;
+const MAX = 50;
 
 interface Props {
   title: Localized;
@@ -17,7 +17,7 @@ const text = (l: Localized) => l.hu ?? l.en ?? '';
 /** A szöveget mindkét nyelvi mezőbe írjuk, így a szavazó a nyelvétől függetlenül ugyanazt látja. */
 const both = (v: string): Localized => ({ hu: v, en: v });
 
-/** A szavazás tartalma: cím és 2–10 válaszlehetőség (létrehozáshoz és módosításhoz közös). */
+/** A szavazás tartalma: cím és 2–50 válaszlehetőség (létrehozáshoz és módosításhoz közös). */
 export function ContentFields({ title, setTitle, options, setOptions }: Props) {
   const { t } = useLang();
   const fileRef = useRef<HTMLInputElement>(null);
