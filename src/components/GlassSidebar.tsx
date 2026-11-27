@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useLang } from '../i18n';
 
-export type IconName = 'list' | 'plan' | 'qr' | 'stats' | 'folder' | 'key' | 'logout';
+export type IconName = 'list' | 'plan' | 'qr' | 'stats' | 'folder' | 'key' | 'log' | 'logout';
 
 const PATHS: Record<IconName, ReactNode> = {
   list: (
@@ -36,6 +36,12 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <circle cx="8" cy="15" r="4" />
       <path d="M11 12l9-9M16 7l3 3M14 9l2 2" />
+    </>
+  ),
+  log: (
+    <>
+      <path d="M12 7v5l3 2" />
+      <circle cx="12" cy="12" r="9" />
     </>
   ),
   logout: <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M15 16l5-4-5-4M20 12H9" />,

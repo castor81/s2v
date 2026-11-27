@@ -3,6 +3,7 @@ import { guard, limitReached, rateLimited, send } from './_lib/http.js';
 import { resolveGateCode } from './_lib/codes.js';
 import { insertPoll } from './_lib/pollCreate.js';
 import { validateCreate, validateSchedule } from './_lib/validate.js';
+import { audit, titleText } from './_lib/audit.js';
 
 // POST /api/create  { gateCode, title: {hu,en}, options: [{hu,en}, ...], opensAt?, closesAt? }
 // → { slug, voteUrl, organizerUrl }   (a szervezői link csak most jelenik meg, később nem kérhető le)
@@ -45,6 +46,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       codeId: access.codeId,
     });
     if (!created.ok) return send(res, 500, { error: created.error });
+    await audit({
+      actorRole: 'editor',
+      actorLabel: access.codeLabel ?? 'general',
+      codeId: access.codeId,
+      action: 'poll.create',
+      projectId: access.projectId,
+      projectName: access.projectName,
+      pollId: created.id,
+      pollSlug: created.slug,
+      pollTitle: titleText(parsed.value.title),
+    });
     return send(res, 201, {
       slug: created.slug,
       voteUrl: created.voteUrl,

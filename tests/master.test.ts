@@ -25,7 +25,7 @@ const OPTS = [
 let tables: Tables;
 let ipCounter = 0;
 beforeEach(() => {
-  tables = { polls: [], votes: [], poll_sessions: [], s2v_projects: [], s2v_access_codes: [] };
+  tables = { polls: [], votes: [], poll_sessions: [], s2v_projects: [], s2v_access_codes: [], s2v_audit_log: [] };
   __setDbForTests(makeFakeDb(tables));
 });
 
@@ -377,4 +377,93 @@ test('code.create: a master kóddal azonos szerkesztői kód nem adható ki', as
   } finally {
     process.env.MASTER_CODE = old;
   }
+});
+
+// ---- Direktor kód és tevékenységnapló ----
+import status from '../api/status.js';
+
+const DC = '140901';
+const auditRows = () => tables.s2v_audit_log as Row[];
+
+test('direktor kód: a master jogosultságaival lép be, a napló megkülönbözteti; a master kóddal azonos kód nem adható ki', async () => {
+  process.env.DIRECTOR_CODE = DC;
+  try {
+    const ip = '10.8.0.1';
+    assert.deepEqual((await call(signin, { code: DC }, ip)).body, { role: 'director' });
+    const r = await call(master, { masterCode: DC, action: 'project.create', name: 'Direktori' }, ip);
+    assert.equal(r.code, 201);
+    assert.equal((await call(master, { masterCode: DC, action: 'overview' }, ip)).code, 200);
+    assert.deepEqual(
+      auditRows().map((e) => [e.actor_role, e.action]),
+      [
+        ['director', 'signin'],
+        ['director', 'project.create'],
+      ],
+    );
+    // a szerkesztői kód nem lehet azonos a direktor kóddal
+    assert.equal((await m('code.create', { label: 'x', code: DC })).code, 409);
+  } finally {
+    delete process.env.DIRECTOR_CODE;
+  }
+});
+
+test('napló: master műveletek pillanatfelvétellel (törlés után is olvasható), a kód értéke sosem kerül bele', async () => {
+  const proj = (await m('project.create', { name: 'Gyakorlat' })).body.id;
+  const created = await m('poll.create', { title: { hu: 'Kedvenc' }, options: [{ hu: 'a' }, { hu: 'b' }], projectId: proj });
+  assert.equal(created.code, 201);
+  const poll = tables.polls[0] as Row;
+  await m('poll.status', { id: poll.id, to: 'close' });
+  await m('poll.meta', { id: poll.id, archived: true });
+  await m('project.rename', { id: proj, name: 'Gyakorlat 2' });
+  await m('code.create', { label: 'Hallgatói', code: '482915', projectId: proj });
+  await m('poll.delete', { id: poll.id });
+
+  const acts = auditRows().map((e) => e.action);
+  assert.deepEqual(acts, ['project.create', 'poll.create', 'poll.close', 'poll.archive', 'project.rename', 'code.create', 'poll.delete']);
+  const del = auditRows()[6];
+  assert.equal(del.poll_title, 'Kedvenc');
+  assert.equal(del.project_name, 'Gyakorlat 2');
+  assert.equal(auditRows()[1].project_name, 'Gyakorlat');
+  assert.equal(auditRows()[4].detail.to, 'Gyakorlat 2');
+  assert.equal(auditRows().every((e) => e.actor_role === 'master'), true);
+  assert.equal(JSON.stringify(auditRows()).includes('482915'), false);
+  assert.equal(auditRows()[5].detail.code, 'Hallgatói');
+
+  // sikertelen művelet nem naplózódik
+  const before = auditRows().length;
+  assert.equal((await m('poll.delete', { id: poll.id })).code, 404);
+  assert.equal(auditRows().length, before);
+});
+
+test('napló: szerkesztői belépés, szavazás-létrehozás és szervezői lezárás a kód megnevezésével', async () => {
+  const proj = (await m('project.create', { name: 'Konf' })).body.id;
+  await m('code.create', { label: 'Konferencia-kód', code: '735190', projectId: proj });
+  const ip = '10.8.0.2';
+  assert.equal((await call(signin, { code: '735 190' }, ip)).code, 200);
+  const c = await call(create, { gateCode: '735190', title: { hu: 'Előadás' }, options: [{ hu: 'a' }, { hu: 'b' }] }, ip);
+  assert.equal(c.code, 201);
+  const token = String(c.body.organizerUrl).split('/o/')[1];
+  assert.equal((await call(status, { token, action: 'close' }, ip)).code, 200);
+
+  const rows = auditRows().filter((e) => e.actor_role !== 'master');
+  assert.deepEqual(rows.map((e) => [e.actor_role, e.action, e.actor_label, e.project_name]), [
+    ['editor', 'signin', 'Konferencia-kód', 'Konf'],
+    ['editor', 'poll.create', 'Konferencia-kód', 'Konf'],
+    ['organizer', 'poll.close', 'Konferencia-kód', 'Konf'],
+  ]);
+  assert.equal(rows[2].poll_title, 'Előadás');
+  assert.ok(rows[1].code_id && rows[1].code_id === rows[2].code_id);
+});
+
+test('audit.list: legfrissebb elöl, időszűrés; a naplót csak a master/direktor kód olvashatja', async () => {
+  await m('project.create', { name: 'A' });
+  await m('project.create', { name: 'B' });
+  auditRows()[0].at = '2026-01-01T10:00:00.000Z';
+  const all = await m('audit.list');
+  assert.equal(all.code, 200);
+  assert.deepEqual(all.body.entries.map((e: Row) => e.projectName), ['B', 'A']);
+  const some = await m('audit.list', { from: '2026-06-01T00:00:00.000Z' });
+  assert.deepEqual(some.body.entries.map((e: Row) => e.projectName), ['B']);
+  assert.equal((await m('audit.list', {}, 'rossz-kod')).code, 401);
+  assert.equal((await m('audit.list', { from: 'nem-datum' })).code, 400);
 });

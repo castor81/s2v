@@ -8,11 +8,12 @@ import { StatsTab } from '../components/master/StatsTab';
 import { PollsTab } from '../components/master/PollsTab';
 import { ProjectsTab } from '../components/master/ProjectsTab';
 import { CodesTab } from '../components/master/CodesTab';
+import { AuditTab } from '../components/master/AuditTab';
 
-type Tab = 'polls' | 'planner' | 'links' | 'stats' | 'projects' | 'codes';
+type Tab = 'polls' | 'planner' | 'links' | 'stats' | 'projects' | 'codes' | 'audit';
 const REFRESH_MS = 5000;
 
-export function MasterPage({ code, onLogout }: { code: string; onLogout: () => void }) {
+export function MasterPage({ code, role, onLogout }: { code: string; role: 'master' | 'director'; onLogout: () => void }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState<Tab>('polls');
   const [data, setData] = useState<Overview | null>(null);
@@ -65,6 +66,7 @@ export function MasterPage({ code, onLogout }: { code: string; onLogout: () => v
     { key: 'stats', label: t('navStats'), icon: 'stats' },
     { key: 'projects', label: t('mTabProjects'), icon: 'folder' },
     { key: 'codes', label: t('mTabCodes'), icon: 'key' },
+    { key: 'audit', label: t('mTabAudit'), icon: 'log' },
   ];
   const heading: Record<Tab, MessageKey> = {
     polls: 'mTabPolls',
@@ -73,11 +75,12 @@ export function MasterPage({ code, onLogout }: { code: string; onLogout: () => v
     stats: 'navStats',
     projects: 'mTabProjects',
     codes: 'mTabCodes',
+    audit: 'mTabAudit',
   };
 
   return (
     <div className="workspace">
-      <GlassSidebar items={items} active={tab} onSelect={setTab} title={t('sbMaster')} subtitle={t('mTitle')} logoutLabel={t('mLogout')} onLogout={onLogout} />
+      <GlassSidebar items={items} active={tab} onSelect={setTab} title={role === 'director' ? t('sbDirector') : t('sbMaster')} subtitle={t('mTitle')} logoutLabel={t('mLogout')} onLogout={onLogout} />
       <div className="wcontent">
         {!data ? (
           loadError ? (
@@ -89,7 +92,7 @@ export function MasterPage({ code, onLogout }: { code: string; onLogout: () => v
           )
         ) : (
           <>
-            {(tab === 'polls' || tab === 'projects' || tab === 'codes') && <h1>{t(heading[tab])}</h1>}
+            {(tab === 'polls' || tab === 'projects' || tab === 'codes' || tab === 'audit') && <h1>{t(heading[tab])}</h1>}
             {tab === 'polls' && <PollsTab code={code} data={data} reload={reload} />}
             {tab === 'planner' && (
               <PollPlanner
@@ -102,6 +105,7 @@ export function MasterPage({ code, onLogout }: { code: string; onLogout: () => v
             {tab === 'stats' && <StatsTab data={data} />}
             {tab === 'projects' && <ProjectsTab code={code} data={data} reload={reload} />}
             {tab === 'codes' && <CodesTab code={code} data={data} reload={reload} />}
+            {tab === 'audit' && <AuditTab code={code} />}
             <p className="hint">
               {t('mAutoRefresh')}
               {updated && ` ${t('updatedAt')}: ${updated.toLocaleTimeString(lang === 'hu' ? 'hu-HU' : 'en-GB')}.`}

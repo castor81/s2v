@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { db, guard, send } from './_lib/http.js';
 import { sha256Hex } from './_lib/crypto.js';
 import { effectiveStatus, isToken } from './_lib/validate.js';
+import { auditOrganizer } from './_lib/audit.js';
 
 // POST /api/status  { token, action: 'open' | 'close' }
 // A szervező lezárhatja vagy újranyithatja a szavazást (F4). A lezárás rögzíti a closed_at
@@ -25,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('polls')
       .update(patch)
       .eq('organizer_token_hash', sha256Hex(token))
-      .select('status, opens_at, closes_at')
+      .select('id, slug, title, code_id, project_id, status, opens_at, closes_at')
       .maybeSingle();
     if (error) {
       console.error('status: update failed', error.code, error.message);
@@ -33,6 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!data) return send(res, 404, { error: 'not_found' });
 
+    await auditOrganizer(data, action === 'close' ? 'poll.close' : 'poll.reopen');
     return send(res, 200, { status: effectiveStatus(data) });
   } catch (e) {
     console.error('status failed', e);

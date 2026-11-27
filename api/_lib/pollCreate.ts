@@ -12,7 +12,7 @@ export interface NewPoll {
 }
 
 export type Created =
-  | { ok: true; slug: string; voteUrl: string; organizerUrl: string }
+  | { ok: true; id: string; slug: string; voteUrl: string; organizerUrl: string }
   | { ok: false; error: 'slug_collision' | 'server_error' };
 
 /** Szavazás beszúrása új szervezői tokennel. A szervezői hivatkozás csak a visszatérési értékben él. */
@@ -24,7 +24,7 @@ export async function insertPoll(p: NewPoll): Promise<Created> {
   // A slug-ütközés (23505) elvileg ritka; néhányszor újrapróbáljuk.
   for (let attempt = 0; attempt < 5; attempt++) {
     const slug = generateSlug();
-    const { error } = await db().from('polls').insert({
+    const { data, error } = await db().from('polls').insert({
       slug,
       title: p.title,
       options: p.options,
@@ -34,9 +34,9 @@ export async function insertPoll(p: NewPoll): Promise<Created> {
       organizer_token_hash: tokenHash,
       project_id: p.projectId,
       code_id: p.codeId,
-    });
+    }).select('id').single();
     if (!error) {
-      return { ok: true, slug, voteUrl: `${baseUrl}/${slug}`, organizerUrl: `${baseUrl}/o/${token}` };
+      return { ok: true, id: String(data?.id ?? ''), slug, voteUrl: `${baseUrl}/${slug}`, organizerUrl: `${baseUrl}/o/${token}` };
     }
     if (error.code !== '23505') {
       console.error('create poll failed', error.code, error.message);

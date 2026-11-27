@@ -5,7 +5,7 @@ import { errorCode, post } from '../lib/api';
 const DIGITS = 6;
 
 interface Props {
-  onSignedIn: (role: 'master' | 'editor', code: string, projectName: string | null) => void;
+  onSignedIn: (role: 'master' | 'director' | 'editor', code: string, projectName: string | null) => void;
 }
 
 /**
@@ -23,10 +23,10 @@ export function PadlockSignIn({ onSignedIn }: Props) {
   async function check(code: string) {
     setState('checking');
     setMessage('');
-    const r = await post<{ role: 'master' | 'editor'; projectName?: string | null }>('/api/signin', { code });
+    const r = await post<{ role: 'master' | 'director' | 'editor'; projectName?: string | null }>('/api/signin', { code });
     if (r.ok) {
       setState('ok');
-      const { role, projectName } = r.data as { role: 'master' | 'editor'; projectName?: string | null };
+      const { role, projectName } = r.data as { role: 'master' | 'director' | 'editor'; projectName?: string | null };
       // Rövid szünet, hogy a lakat nyitása látszódjon (csökkentett mozgásnál nincs késleltetés).
       const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
       setTimeout(() => onSignedIn(role, code, projectName ?? null), reduce ? 0 : 600);

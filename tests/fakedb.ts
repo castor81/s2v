@@ -15,6 +15,9 @@ const DEFAULTS: Record<string, Row> = { s2v_access_codes: { active: true, use_co
 
 class Q implements PromiseLike<any> {
   private filters: Array<[string, unknown]> = [];
+  private ranges: Array<[string, '>=' | '<=', string]> = [];
+  private orderBy: { col: string; asc: boolean } | null = null;
+  private max = Infinity;
   private op: 'select' | 'update' | 'insert' | 'delete' = 'select';
   private patch: Row = {};
   private count = false;
@@ -29,7 +32,20 @@ class Q implements PromiseLike<any> {
     this.filters.push([c, v]);
     return this;
   }
-  order() {
+  order(col?: string, o?: { ascending?: boolean }) {
+    if (col) this.orderBy = { col, asc: o?.ascending !== false };
+    return this;
+  }
+  gte(c: string, v: string) {
+    this.ranges.push([c, '>=', v]);
+    return this;
+  }
+  lte(c: string, v: string) {
+    this.ranges.push([c, '<=', v]);
+    return this;
+  }
+  limit(n: number) {
+    this.max = n;
     return this;
   }
   range() {
@@ -71,11 +87,18 @@ class Q implements PromiseLike<any> {
         );
         if (dup) return { data: null, error: { code: '23505', message: 'duplicate' } };
       }
-      const row = { id: randomUUID(), ...(DEFAULTS[this.table] ?? {}), ...this.patch };
+      const row = { id: randomUUID(), ...(DEFAULTS[this.table] ?? {}), ...(this.table === 's2v_audit_log' ? { at: new Date().toISOString() } : {}), ...this.patch };
       rows.push(row);
       return { data: single ? row : [row], error: null };
     }
-    const match = rows.filter((r) => this.filters.every(([c, v]) => r[c] === v));
+    let match = rows.filter(
+      (r) => this.filters.every(([c, v]) => r[c] === v) && this.ranges.every(([c, op, v]) => (op === '>=' ? String(r[c]) >= v : String(r[c]) <= v)),
+    );
+    if (this.orderBy) {
+      const { col, asc } = this.orderBy;
+      match = [...match].sort((a, b) => (String(a[col]) < String(b[col]) ? -1 : String(a[col]) > String(b[col]) ? 1 : 0) * (asc ? 1 : -1));
+    }
+    if (Number.isFinite(this.max)) match = match.slice(0, this.max);
     if (this.op === 'update') {
       for (const col of UNIQUE[this.table] ?? []) {
         if (typeof this.patch[col] === 'string') {

@@ -26,7 +26,7 @@ export function App() {
     setAuthState(a);
   };
   const workspace = path === '/';
-  const wide = workspace && auth?.role === 'master';
+  const wide = workspace && (auth?.role === 'master' || auth?.role === 'director');
   return (
     <div className={wide ? 'shell wide' : 'shell'}>
       <header className="topbar">

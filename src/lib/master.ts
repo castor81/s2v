@@ -37,6 +37,23 @@ export interface MCode {
   createdAt: string;
 }
 
+export type AuditRole = 'master' | 'director' | 'editor' | 'organizer';
+
+export interface AuditEntry {
+  id: string;
+  at: string;
+  actorRole: AuditRole;
+  actorLabel: string | null;
+  codeId: string | null;
+  action: string;
+  projectId: string | null;
+  projectName: string | null;
+  pollId: string | null;
+  pollSlug: string | null;
+  pollTitle: string | null;
+  detail: Record<string, unknown> | null;
+}
+
 export interface Overview {
   now: string;
   retentionDays: number;

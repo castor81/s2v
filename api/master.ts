@@ -4,13 +4,14 @@ import { generateAccessCode, generateToken, safeEqual, sha256Hex } from './_lib/
 import { hashAccessCode, validateAccessCode } from './_lib/codes.js';
 import { insertPoll } from './_lib/pollCreate.js';
 import { planEdit } from './_lib/pollEdit.js';
+import { LOGGED_ACTIONS, logMasterAction, preContext } from './_lib/masterAudit.js';
 import { effectiveStatus, validateCreate, validateSchedule, type PollOption } from './_lib/validate.js';
 
 // POST /api/master  { masterCode, action, ...adatok }
 // A master felület egyetlen végpontja (egy szerver nélküli függvény). Minden kérés a master kóddal
 // hitelesít; a kód a MASTER_CODE környezeti változóban van, a kliens csak a böngésző munkamenetében őrzi.
 //
-// Műveletek: overview · poll.create · poll.update · poll.meta · poll.status · poll.delete · poll.copy · poll.newToken ·
+// Műveletek: overview · audit.list · poll.create · poll.update · poll.meta · poll.status · poll.delete · poll.copy · poll.newToken ·
 //            project.create · project.rename · project.delete · code.create · code.update · code.delete
 
 const RETENTION_DAYS = 30; // a lezárt szavazások megőrzése (A1), megegyezik a purge_closed_polls alapértékével
@@ -296,6 +297,44 @@ async function projectDelete(body: Body): Promise<Reply> {
   return ok();
 }
 
+// ---------------- napló ----------------
+
+const AUDIT_MAX = 2000;
+
+/** A tevékenységnapló (legfrissebb elöl); időszűrés itt, a többi szűrés a felületen történik. */
+async function auditList(body: Body): Promise<Reply> {
+  const from = parseInstantOrNull(body.from);
+  const to = parseInstantOrNull(body.to);
+  if (!from.ok || !to.ok) return fail(400, 'invalid_request');
+  let q = db()
+    .from('s2v_audit_log')
+    .select('id, at, actor_role, actor_label, code_id, action, project_id, project_name, poll_id, poll_slug, poll_title, detail')
+    .order('at', { ascending: false });
+  if (from.value) q = q.gte('at', from.value);
+  if (to.value) q = q.lte('at', to.value);
+  const { data, error } = await q.limit(AUDIT_MAX + 1);
+  if (error) {
+    console.error('master: audit list failed', error.code, error.message);
+    return serverError();
+  }
+  const rows = data ?? [];
+  const entries = rows.slice(0, AUDIT_MAX).map((e) => ({
+    id: e.id,
+    at: e.at,
+    actorRole: e.actor_role,
+    actorLabel: e.actor_label,
+    codeId: e.code_id,
+    action: e.action,
+    projectId: e.project_id,
+    projectName: e.project_name,
+    pollId: e.poll_id,
+    pollSlug: e.poll_slug,
+    pollTitle: e.poll_title,
+    detail: e.detail,
+  }));
+  return ok({ entries, truncated: rows.length > AUDIT_MAX });
+}
+
 // ---------------- kódtár ----------------
 
 async function codeCreate(body: Body): Promise<Reply> {
@@ -314,9 +353,10 @@ async function codeCreate(body: Body): Promise<Reply> {
   // Az általános belépési kóddal azonos kód nem vehető fel (félreérthető lenne a használata).
   const general = process.env.CREATE_GATE_CODE;
   if (general && safeEqual(code, general)) return fail(409, 'code_taken');
-  // A master kóddal azonos szerkesztői kód nem adható ki (a közös belépőn a master kód az erősebb).
-  const masterEnv = process.env.MASTER_CODE;
-  if (masterEnv && safeEqual(code, masterEnv)) return fail(409, 'code_taken');
+  // A master vagy direktor kóddal azonos szerkesztői kód nem adható ki (a közös belépőn azok az erősebbek).
+  for (const env of [process.env.MASTER_CODE, process.env.DIRECTOR_CODE]) {
+    if (env && safeEqual(code, env)) return fail(409, 'code_taken');
+  }
 
   const projectId = body.projectId ?? null;
   const pe = await checkProject(projectId);
@@ -405,6 +445,7 @@ const ACTIONS: Record<string, (b: Body) => Promise<Reply>> = {
   'code.create': codeCreate,
   'code.update': codeUpdate,
   'code.delete': codeDelete,
+  'audit.list': auditList,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -412,8 +453,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (guard(req, res, 'master', 240)) return;
 
   try {
-    const expected = process.env.MASTER_CODE;
-    if (!expected) return send(res, 503, { error: 'master_disabled' });
+    const masterEnv = process.env.MASTER_CODE;
+    const directorEnv = process.env.DIRECTOR_CODE;
+    if (!masterEnv && !directorEnv) return send(res, 503, { error: 'master_disabled' });
 
     // Találgatás ellen: sikertelen próbák után az IP-t percre zároljuk (a helyes kód is 429-et kap).
     if (limitReached(req, 'masterfail', 10)) {
@@ -421,7 +463,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return send(res, 429, { error: 'rate_limited' });
     }
     const body = (req.body ?? {}) as Body;
-    if (typeof body.masterCode !== 'string' || !safeEqual(body.masterCode, expected)) {
+    // A master és a direktor kód jogosultsága azonos; a napló megkülönbözteti őket.
+    const given = typeof body.masterCode === 'string' ? body.masterCode : '';
+    const role = masterEnv && safeEqual(given, masterEnv) ? 'master' : directorEnv && safeEqual(given, directorEnv) ? 'director' : null;
+    if (!given || !role) {
       rateLimited(req, 'masterfail', 10);
       return send(res, 401, { error: 'invalid_master_code' });
     }
@@ -430,7 +475,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const fn = typeof body.action === 'string' ? ACTIONS[body.action] : undefined;
     if (!fn) return send(res, 400, { error: 'unknown_action' });
 
+    const action = body.action as string;
+    const logged = LOGGED_ACTIONS.has(action);
+    const pre = logged ? await preContext(action, body) : {};
     const r = await fn(body);
+    if (logged && r.status < 300) await logMasterAction(role, action, body, pre, r.body);
     return send(res, r.status, r.body);
   } catch (e) {
     console.error('master failed', e);

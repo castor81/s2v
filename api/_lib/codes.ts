@@ -27,6 +27,8 @@ export function hashAccessCode(code: string): string {
 export interface GateResult {
   /** A kódtár bejegyzése; null = az általános (környezeti) belépési kód. */
   codeId: string | null;
+  /** A kódtár bejegyzésének megnevezése (naplózáshoz); null = általános kód. */
+  codeLabel: string | null;
   /** A kódhoz kötött projekt; null = nincs kötés. */
   projectId: string | null;
   /** A projekt neve (megjelenítéshez); null = nincs kötés. */
@@ -41,14 +43,14 @@ export async function resolveGateCode(gate: unknown, opts: { count?: boolean } =
   if (typeof gate !== 'string' || gate.length === 0 || gate.length > 128) return null;
 
   const env = process.env.CREATE_GATE_CODE;
-  if (env && safeEqual(gate, env)) return { codeId: null, projectId: null, projectName: null };
+  if (env && safeEqual(gate, env)) return { codeId: null, codeLabel: null, projectId: null, projectName: null };
 
   const digits = normalizeCode(gate);
   if (!CODE_RE.test(digits)) return null;
 
   const { data: row, error } = await db()
     .from('s2v_access_codes')
-    .select('id, project_id, active, expires_at, use_count')
+    .select('id, label, project_id, active, expires_at, use_count')
     .eq('code_hash', hashAccessCode(digits))
     .maybeSingle();
   if (error) {
@@ -72,5 +74,5 @@ export async function resolveGateCode(gate: unknown, opts: { count?: boolean } =
     const { data: pr } = await db().from('s2v_projects').select('name').eq('id', row.project_id).maybeSingle();
     projectName = pr?.name ?? null;
   }
-  return { codeId: row.id, projectId: row.project_id ?? null, projectName };
+  return { codeId: row.id, codeLabel: row.label ?? null, projectId: row.project_id ?? null, projectName };
 }

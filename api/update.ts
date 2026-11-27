@@ -3,6 +3,7 @@ import { db, guard, send } from './_lib/http.js';
 import { sha256Hex } from './_lib/crypto.js';
 import { effectiveStatus, isToken } from './_lib/validate.js';
 import { planEdit } from './_lib/pollEdit.js';
+import { auditOrganizer } from './_lib/audit.js';
 
 // POST /api/update  { token, title?, options?, opensAt?, closesAt? }
 // A szervező módosíthatja a szavazást:
@@ -19,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: poll, error } = await db()
       .from('polls')
-      .select('id, title, options, status, opens_at, closes_at')
+      .select('id, slug, title, options, status, opens_at, closes_at, code_id, project_id')
       .eq('organizer_token_hash', sha256Hex(body.token))
       .maybeSingle();
     if (error) {
@@ -41,6 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('update failed', upErr?.code, upErr?.message);
       return send(res, 500, { error: 'server_error' });
     }
+    await auditOrganizer(poll, 'poll.update', { fields: Object.keys(plan.patch) });
     return send(res, 200, { status: effectiveStatus(data), opensAt: data.opens_at, closesAt: data.closes_at });
   } catch (e) {
     console.error('update failed', e);

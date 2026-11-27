@@ -2,7 +2,7 @@
 
 QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokumentáció: projektprofil v1.0, G2 követelmény-alapvonal v1.1, G3 architektúra v1.1.
 
-**Állapot:** 2. iteráció, 4. rész (v0.7.0) · 2026-11-27
+**Állapot:** 2. iteráció, 4. rész (v0.8.0) · 2026-11-27
 
 ## Mi van benne (1. iteráció)
 
@@ -51,7 +51,7 @@ BASE_URL=https://s2vote.vercel.app GATE_CODE=... npm run loadtest   # 300 szavaz
 - A 30 napos törlés (`purge_closed_polls`) ütemezése (n8n) a 2. iteráció következő részében kerül be. A soha le nem zárt, zárási időpont nélküli szavazás nem törlődik automatikusan: érdemes zárási időpontot megadni.
 
 
-## Master felület (v0.7.0)
+## Master felület (v0.8.0)
 
 Cím: `/` – közös belépő (a master a `MASTER_CODE` kóddal lép be; a kód csak a böngészőlap munkamenetében marad meg).
 
@@ -62,3 +62,10 @@ Cím: `/` – közös belépő (a master a `MASTER_CODE` kóddal lép be; a kód
 
 **UI (v0.6.0):** HU/EN kapcsoló (billenő switch), oldalsó üveghatású (glassmorphic) menüsáv a szerkesztői és a master felületen (Szavazástervező, QR-kódok és linkek, Statisztika, Projektek, Szerkesztői kódok), forgó NKE-logó a belépőpanel alatt (`prefers-reduced-motion` esetén statikus).
 - Adatbázis: a `0003_master.sql` az `s2v_projects` és `s2v_access_codes` táblákat hozza létre (a közös KM-dev projektben más alkalmazás is használ `projects` nevű táblát).
+
+## Direktor kód és tevékenységnapló (v0.8.0)
+
+- **Direktor kód:** a `DIRECTOR_CODE` környezeti változó (Vercel, titkos) a masterrel azonos jogosultságot ad; ugyanazon a közös belépő oldalon lehet vele belépni. A napló megkülönbözteti a masteri és a direktori műveleteket. A szerkesztői kód nem lehet azonos a master vagy a direktor kóddal.
+- **Napló** (master és direktor számára, külön menüpont): időrendben, ki mit csinált. Naplózott: belépések (master, direktor, szerkesztői kód); szavazás létrehozása/módosítása/lezárása/újranyitása/áthelyezése/archiválása/törlése/másolása, új szervezői link; projekt létrehozása/átnevezése/törlése; szerkesztői kód kiadása/módosítása/be-/kikapcsolása/törlése; a szervezői linkkel végzett módosítás és lezárás (a szavazás kódjának megnevezésével). Szűrhető: felhasználó (master / direktor / szerkesztői kód), projekt, szavazás, tevékenység, időszak, szabad szöveg.
+- A napló az elemek nevét a bejegyzés pillanatában őrzi, így törlés után is olvasható. **A kódok értéke soha nem kerül a naplóba.** A bejegyzések megőrzése jelenleg korlátlan (`s2v_audit_log`, migráció: `supabase/migrations/0004_audit.sql`).
+
