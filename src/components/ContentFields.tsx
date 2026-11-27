@@ -10,25 +10,20 @@ interface Props {
   setOptions: (o: Localized[]) => void;
 }
 
-/** A szavazás tartalma: kétnyelvű cím és 2–10 válaszlehetőség (létrehozáshoz és módosításhoz közös). */
+/** Egyetlen megjelenített szöveg (a felületi nyelv váltása nem fordítja a szavazás tartalmát). */
+const text = (l: Localized) => l.hu ?? l.en ?? '';
+/** A szöveget mindkét nyelvi mezőbe írjuk, így a szavazó a nyelvétől függetlenül ugyanazt látja. */
+const both = (v: string): Localized => ({ hu: v, en: v });
+
+/** A szavazás tartalma: cím és 2–10 válaszlehetőség (létrehozáshoz és módosításhoz közös). */
 export function ContentFields({ title, setTitle, options, setOptions }: Props) {
   const { t } = useLang();
 
-  function setOption(i: number, lang: 'hu' | 'en', value: string) {
-    setOptions(options.map((o, idx) => (idx === i ? { ...o, [lang]: value } : o)));
-  }
-
   return (
     <>
-      <p className="hint">{t('langHint')}</p>
-
       <div className="field">
-        <label htmlFor="title-hu">{t('pollTitleHu')}</label>
-        <input id="title-hu" maxLength={120} value={title.hu ?? ''} onChange={(e) => setTitle({ ...title, hu: e.target.value })} />
-      </div>
-      <div className="field">
-        <label htmlFor="title-en">{t('pollTitleEn')}</label>
-        <input id="title-en" maxLength={120} value={title.en ?? ''} onChange={(e) => setTitle({ ...title, en: e.target.value })} />
+        <label htmlFor="poll-title">{t('pollTitle')}</label>
+        <input id="poll-title" maxLength={120} value={text(title)} onChange={(e) => setTitle(both(e.target.value))} />
       </div>
 
       <fieldset>
@@ -36,12 +31,13 @@ export function ContentFields({ title, setTitle, options, setOptions }: Props) {
         {options.map((o, i) => (
           <div key={i} className="option-row">
             <div className="field">
-              <label htmlFor={`o-${i}-hu`}>{`${t('optionN')} ${i + 1} · ${t('optionHu')}`}</label>
-              <input id={`o-${i}-hu`} maxLength={80} value={o.hu ?? ''} onChange={(e) => setOption(i, 'hu', e.target.value)} />
-            </div>
-            <div className="field">
-              <label htmlFor={`o-${i}-en`}>{`${t('optionN')} ${i + 1} · ${t('optionEn')}`}</label>
-              <input id={`o-${i}-en`} maxLength={80} value={o.en ?? ''} onChange={(e) => setOption(i, 'en', e.target.value)} />
+              <label htmlFor={`o-${i}`}>{`${t('optionN')} ${i + 1}`}</label>
+              <input
+                id={`o-${i}`}
+                maxLength={80}
+                value={text(o)}
+                onChange={(e) => setOptions(options.map((x, idx) => (idx === i ? both(e.target.value) : x)))}
+              />
             </div>
             {options.length > MIN && (
               <button type="button" className="button" onClick={() => setOptions(options.filter((_, idx) => idx !== i))}>
@@ -51,7 +47,7 @@ export function ContentFields({ title, setTitle, options, setOptions }: Props) {
           </div>
         ))}
         {options.length < MAX && (
-          <button type="button" className="button" onClick={() => setOptions([...options, { hu: '', en: '' }])}>
+          <button type="button" className="button" onClick={() => setOptions([...options, both('')])}>
             {t('addOption')}
           </button>
         )}

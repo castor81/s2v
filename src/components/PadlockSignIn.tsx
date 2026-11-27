@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useLang, type MessageKey } from '../i18n';
 import { errorCode, post } from '../lib/api';
 
-const DIGITS = 8;
+const DIGITS = 6;
 
 interface Props {
-  onSignedIn: (code: string, projectName: string | null) => void;
+  onSignedIn: (role: 'master' | 'editor', code: string, projectName: string | null) => void;
 }
 
 /**
- * Szerkesztői belépő oldal: 8 jegyű számkód "kódzár" mezőkkel (egyetlen valódi beviteli mező fölött),
+ * Közös belépő oldal (master és szerkesztő): 6 jegyű számkód "kódzár" mezőkkel (egyetlen valódi beviteli mező fölött),
  * a lakat a sikeres belépésnél kinyílik. A forgó NKE logó a panel alatt van.
  */
 export function PadlockSignIn({ onSignedIn }: Props) {
@@ -23,17 +23,17 @@ export function PadlockSignIn({ onSignedIn }: Props) {
   async function check(code: string) {
     setState('checking');
     setMessage('');
-    const r = await post<{ projectName: string | null }>('/api/create', { gateCode: code, check: true });
+    const r = await post<{ role: 'master' | 'editor'; projectName?: string | null }>('/api/signin', { code });
     if (r.ok) {
       setState('ok');
-      const name = (r.data as { projectName: string | null }).projectName;
+      const { role, projectName } = r.data as { role: 'master' | 'editor'; projectName?: string | null };
       // Rövid szünet, hogy a lakat nyitása látszódjon (csökkentett mozgásnál nincs késleltetés).
       const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-      setTimeout(() => onSignedIn(code, name), reduce ? 0 : 600);
+      setTimeout(() => onSignedIn(role, code, projectName ?? null), reduce ? 0 : 600);
       return;
     }
     setState('error');
-    setMessage(r.status === 429 ? 'siLocked' : errorCode(r) === 'invalid_gate_code' ? 'siError' : 'errGeneric');
+    setMessage(r.status === 429 ? 'siLocked' : errorCode(r) === 'invalid_code' ? 'siError' : 'errGeneric');
     setValue('');
   }
 

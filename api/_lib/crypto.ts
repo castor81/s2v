@@ -39,9 +39,9 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ha, hb);
 }
 
-// Szerkesztői kód: 8 számjegy (a belépő oldalon számbillentyűzettel beírható). 10^8 lehetőség,
+// Szerkesztői kód: 6 számjegy (a belépő oldalon számbillentyűzettel beírható). 10^6 lehetőség,
 // a találgatást a sikertelen próbák IP-zárolása (create.ts) teszi járhatatlanná.
-export const ACCESS_CODE_DIGITS = 8;
+export const ACCESS_CODE_DIGITS = 6;
 
 export function generateAccessCode(): string {
   return String(randomInt(10 ** ACCESS_CODE_DIGITS)).padStart(ACCESS_CODE_DIGITS, '0');

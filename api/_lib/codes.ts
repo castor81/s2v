@@ -2,7 +2,7 @@ import { db } from './http.js';
 import { safeEqual, sha256Hex } from './crypto.js';
 import type { Result } from './validate.js';
 
-export const CODE_DIGITS = 8;
+export const CODE_DIGITS = 6;
 const CODE_RE = new RegExp(`^\\d{${CODE_DIGITS}}$`);
 
 /** A bevitt kód normalizálása: szóköz és kötőjel (tagolás) nélküli számjegyek. */
@@ -10,7 +10,7 @@ export function normalizeCode(v: string): string {
   return v.replace(/[\s-]/g, '');
 }
 
-/** Szerkesztői kód: pontosan 8 számjegy (tagolhatóan is megadható, pl. 1234 5678). */
+/** Szerkesztői kód: pontosan 6 számjegy (tagolhatóan is megadható, pl. 123 456). */
 export function validateAccessCode(v: unknown): Result<string> {
   if (typeof v !== 'string') return { ok: false, error: 'code_invalid' };
   const d = normalizeCode(v);

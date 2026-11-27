@@ -6,7 +6,7 @@ import { validateCreate, validateSchedule } from './_lib/validate.js';
 
 // POST /api/create  { gateCode, title: {hu,en}, options: [{hu,en}, ...], opensAt?, closesAt? }
 // → { slug, voteUrl, organizerUrl }   (a szervezői link csak most jelenik meg, később nem kérhető le)
-// A belépési kód lehet az általános (környezeti) kód vagy a master felületen kezelt 8 jegyű számkód;
+// A belépési kód lehet az általános (környezeti) kód vagy a master felületen kezelt 6 jegyű számkód;
 // a projekthez kötött kód a szavazást a saját projektjébe teszi.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // A belépési kód találgatása ellen szigorúbb korlát (kérés/perc/IP).

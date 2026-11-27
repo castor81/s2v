@@ -1,12 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLang, type MessageKey } from '../i18n';
-import {
-  masterError,
-  masterPost,
-  readSessionCode,
-  writeSessionCode,
-  type Overview,
-} from '../lib/master';
+import { masterPost, type Overview } from '../lib/master';
 import { GlassSidebar, type SideItem } from '../components/GlassSidebar';
 import { PollPlanner, type CreatedPoll } from '../components/PollPlanner';
 import { LinksTab } from '../components/master/LinksTab';
@@ -18,45 +12,7 @@ import { CodesTab } from '../components/master/CodesTab';
 type Tab = 'polls' | 'planner' | 'links' | 'stats' | 'projects' | 'codes';
 const REFRESH_MS = 5000;
 
-function Login({ onLogin }: { onLogin: (code: string) => void }) {
-  const { t } = useLang();
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<MessageKey | ''>('');
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError('');
-    const r = await masterPost(code, 'login');
-    setBusy(false);
-    if (r.ok) onLogin(code);
-    else setError(masterError(r));
-  }
-
-  return (
-    <form onSubmit={onSubmit} noValidate>
-      <h1>{t('mTitle')}</h1>
-      <div className="field">
-        <label htmlFor="m-login">{t('mLoginCode')}</label>
-        <input id="m-login" type="password" autoComplete="off" value={code} onChange={(e) => setCode(e.target.value)} aria-describedby="m-login-h" />
-        <span className="hint" id="m-login-h">
-          {t('mLoginHelp')}
-        </span>
-      </div>
-      {error && (
-        <p role="alert" className="error">
-          {t(error)}
-        </p>
-      )}
-      <button type="submit" className="button primary" disabled={busy || !code}>
-        {busy ? t('loading') : t('mLogin')}
-      </button>
-    </form>
-  );
-}
-
-function Console({ code, onLogout }: { code: string; onLogout: () => void }) {
+export function MasterPage({ code, onLogout }: { code: string; onLogout: () => void }) {
   const { t, lang } = useLang();
   const [tab, setTab] = useState<Tab>('polls');
   const [data, setData] = useState<Overview | null>(null);
@@ -160,24 +116,4 @@ function Console({ code, onLogout }: { code: string; onLogout: () => void }) {
       </div>
     </div>
   );
-}
-
-export function MasterPage() {
-  const [code, setCode] = useState(readSessionCode);
-  const logout = useCallback(() => {
-    writeSessionCode('');
-    setCode('');
-  }, []);
-
-  if (!code) {
-    return (
-      <Login
-        onLogin={(c) => {
-          writeSessionCode(c);
-          setCode(c);
-        }}
-      />
-    );
-  }
-  return <Console code={code} onLogout={logout} />;
 }

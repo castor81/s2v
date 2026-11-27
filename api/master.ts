@@ -314,6 +314,9 @@ async function codeCreate(body: Body): Promise<Reply> {
   // Az általános belépési kóddal azonos kód nem vehető fel (félreérthető lenne a használata).
   const general = process.env.CREATE_GATE_CODE;
   if (general && safeEqual(code, general)) return fail(409, 'code_taken');
+  // A master kóddal azonos szerkesztői kód nem adható ki (a közös belépőn a master kód az erősebb).
+  const masterEnv = process.env.MASTER_CODE;
+  if (masterEnv && safeEqual(code, masterEnv)) return fail(409, 'code_taken');
 
   const projectId = body.projectId ?? null;
   const pe = await checkProject(projectId);

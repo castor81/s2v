@@ -1,9 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useLang } from '../i18n';
 import { post } from '../lib/api';
-import { readEditor, readMade, writeEditor, writeMade, type EditorSession, type MadePoll } from '../lib/editor';
+import { readMade, writeMade, type EditorSession, type MadePoll } from '../lib/editor';
 import { GlassSidebar, type SideItem } from '../components/GlassSidebar';
-import { PadlockSignIn } from '../components/PadlockSignIn';
 import { PollPlanner, type CreatedPoll } from '../components/PollPlanner';
 import { QrBlock } from '../components/QrBlock';
 import { CopyField } from '../components/CopyField';
@@ -12,32 +11,16 @@ import { formatDateTime } from '../lib/time';
 
 type Section = 'planner' | 'links';
 
-/** Szerkesztői terület: számkódos belépés után szavazástervező és a munkamenetben létrehozott szavazások linkjei. */
-export function EditorPage() {
+/** Szerkesztői terület (belépés után): szavazástervező és a munkamenetben létrehozott szavazások linkjei. */
+export function EditorPage({ session, onLogout }: { session: EditorSession; onLogout: () => void }) {
   const { t, lang } = useLang();
-  const [session, setSession] = useState<EditorSession | null>(readEditor);
   const [made, setMade] = useState<MadePoll[]>(readMade);
   const [section, setSection] = useState<Section>('planner');
 
-  const logout = useCallback(() => {
-    writeEditor(null);
+  const logout = () => {
     writeMade(null);
-    setSession(null);
-    setMade([]);
-    setSection('planner');
-  }, []);
-
-  if (!session) {
-    return (
-      <PadlockSignIn
-        onSignedIn={(code, projectName) => {
-          const s = { code, projectName };
-          writeEditor(s);
-          setSession(s);
-        }}
-      />
-    );
-  }
+    onLogout();
+  };
 
   const items: SideItem<Section>[] = [
     { key: 'planner', label: t('navPlanner'), icon: 'plan' },

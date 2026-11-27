@@ -3,6 +3,7 @@ import { useLang, type MessageKey } from '../../i18n';
 import { formatDateTime, timeZoneName, toIso, toLocalInput } from '../../lib/time';
 import { masterError, masterPost, type MCode, type Overview } from '../../lib/master';
 import { CopyField } from '../CopyField';
+import { NumRow } from '../NumRow';
 
 interface Props {
   code: string;
@@ -20,6 +21,13 @@ const STATE_KEY: Record<'active' | 'disabled' | 'expired', MessageKey> = {
   disabled: 'mCodeDisabled',
   expired: 'mCodeExpired',
 };
+
+/** Véletlen számjegyek a böngésző biztonságos véletlenforrásából. */
+function randomDigits(n: number): string {
+  const a = new Uint32Array(n);
+  crypto.getRandomValues(a);
+  return Array.from(a, (v) => String(v % 10)).join('');
+}
 
 export function CodesTab({ code, data, reload }: Props) {
   const { t, lang } = useLang();
@@ -77,10 +85,24 @@ export function CodesTab({ code, data, reload }: Props) {
         </div>
         <div className="field">
           <label htmlFor="m-ccode">{t('mCodeCustom')}</label>
-          <input id="m-ccode" inputMode="numeric" pattern="[0-9 ]*" maxLength={9} autoComplete="off" spellCheck={false} value={custom} onChange={(e) => setCustom(e.target.value)} aria-describedby="m-ccode-h" />
+          <input
+            id="m-ccode"
+            inputMode="numeric"
+            pattern="[0-9 ]*"
+            maxLength={7}
+            autoComplete="off"
+            spellCheck={false}
+            value={custom}
+            onChange={(e) => setCustom(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            aria-describedby="m-ccode-h"
+          />
           <span className="hint" id="m-ccode-h">
             {t('mCodeCustomHint')}
           </span>
+          <NumRow value={custom} onChange={setCustom} max={6} disabled={busy} />
+          <button type="button" className="button" style={{ width: "auto", alignSelf: "flex-start" }} onClick={() => setCustom(randomDigits(6))} disabled={busy}>
+            {t('nrRandom')}
+          </button>
         </div>
         <div className="field">
           <label htmlFor="m-cproj">{t('mCodeProject')}</label>
@@ -118,7 +140,7 @@ export function CodesTab({ code, data, reload }: Props) {
           <p>
             {t('mCodeIssued')} <strong>{issued.label}</strong>
           </p>
-          <CopyField id="m-issued-code" label={t('mCodeValue')} value={`${issued.code.slice(0, 4)} ${issued.code.slice(4)}`} />
+          <CopyField id="m-issued-code" label={t('mCodeValue')} value={`${issued.code.slice(0, 3)} ${issued.code.slice(3)}`} />
           <p>{t('mCodeIssuedWarn')}</p>
           <button type="button" className="button" onClick={() => setIssued(null)}>
             {t('mDismiss')}

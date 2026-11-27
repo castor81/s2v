@@ -1,24 +1,11 @@
-import { Link, Route, Routes, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useLang } from './i18n';
-import { EditorPage } from './pages/EditorPage';
+import { StartPage } from './pages/StartPage';
+import { readAuth, writeAuth, type Auth } from './lib/auth';
 import { LangSwitch } from './components/LangSwitch';
 import { VotePage } from './pages/VotePage';
 import { DashboardPage } from './pages/DashboardPage';
-import { MasterPage } from './pages/MasterPage';
-
-function Home() {
-  const { t } = useLang();
-  return (
-    <>
-      <p>{t('home')}</p>
-      <p>
-        <Link className="button" to="/uj">
-          {t('homeCreate')}
-        </Link>
-      </p>
-    </>
-  );
-}
 
 function NotFound() {
   const { t } = useLang();
@@ -33,8 +20,13 @@ function NotFound() {
 export function App() {
   const { t } = useLang();
   const path = useLocation().pathname;
-  const wide = path.startsWith('/master');
-  const workspace = wide || path === '/uj';
+  const [auth, setAuthState] = useState<Auth | null>(readAuth);
+  const setAuth = (a: Auth | null) => {
+    writeAuth(a);
+    setAuthState(a);
+  };
+  const workspace = path === '/';
+  const wide = workspace && auth?.role === 'master';
   return (
     <div className={wide ? 'shell wide' : 'shell'}>
       <header className="topbar">
@@ -49,10 +41,10 @@ export function App() {
       </header>
       <main id="main" className={workspace ? 'flat' : undefined}>
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/uj" element={<EditorPage />} />
+          <Route path="/" element={<StartPage auth={auth} setAuth={setAuth} />} />
+          <Route path="/uj" element={<Navigate to="/" replace />} />
           <Route path="/o/:token" element={<DashboardPage />} />
-          <Route path="/master" element={<MasterPage />} />
+          <Route path="/master" element={<Navigate to="/" replace />} />
           <Route path="/:slug" element={<VotePage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

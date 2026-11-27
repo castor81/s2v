@@ -939,3 +939,38 @@ input[type='search'] {
     animation: none;
   }
 }
+
+/* Kattintható számsor (master: kódkiadás) */
+.numrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.numkey {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0 0.6rem;
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text, #1d2433);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.numkey.wide {
+  min-width: 4rem;
+}
+.numkey:hover:not(:disabled) {
+  background: #f1ecd9;
+}
+.numkey:focus-visible {
+  outline: 3px solid #c6902a;
+  outline-offset: 2px;
+}
+.numkey:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
