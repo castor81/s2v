@@ -7,11 +7,15 @@ import {
   writeSessionCode,
   type Overview,
 } from '../lib/master';
+import { GlassSidebar, type SideItem } from '../components/GlassSidebar';
+import { PollPlanner, type CreatedPoll } from '../components/PollPlanner';
+import { LinksTab } from '../components/master/LinksTab';
+import { StatsTab } from '../components/master/StatsTab';
 import { PollsTab } from '../components/master/PollsTab';
 import { ProjectsTab } from '../components/master/ProjectsTab';
 import { CodesTab } from '../components/master/CodesTab';
 
-type Tab = 'polls' | 'projects' | 'codes';
+type Tab = 'polls' | 'planner' | 'links' | 'stats' | 'projects' | 'codes';
 const REFRESH_MS = 5000;
 
 function Login({ onLogin }: { onLogin: (code: string) => void }) {
@@ -98,53 +102,63 @@ function Console({ code, onLogout }: { code: string; onLogout: () => void }) {
     };
   }, []);
 
-  const tabs: Array<[Tab, MessageKey]> = [
-    ['polls', 'mTabPolls'],
-    ['projects', 'mTabProjects'],
-    ['codes', 'mTabCodes'],
+  const items: SideItem<Tab>[] = [
+    { key: 'polls', label: t('mTabPolls'), icon: 'list' },
+    { key: 'planner', label: t('navPlanner'), icon: 'plan' },
+    { key: 'links', label: t('navLinks'), icon: 'qr' },
+    { key: 'stats', label: t('navStats'), icon: 'stats' },
+    { key: 'projects', label: t('mTabProjects'), icon: 'folder' },
+    { key: 'codes', label: t('mTabCodes'), icon: 'key' },
   ];
+  const heading: Record<Tab, MessageKey> = {
+    polls: 'mTabPolls',
+    planner: 'navPlanner',
+    links: 'navLinks',
+    stats: 'navStats',
+    projects: 'mTabProjects',
+    codes: 'mTabCodes',
+  };
 
   return (
-    <>
-      <div className="mtop">
-        <h1>{t('mTitle')}</h1>
-        <button type="button" className="button" onClick={onLogout}>
-          {t('mLogout')}
-        </button>
-      </div>
-      <nav aria-label={t('mSections')} className="mtabs">
-        {tabs.map(([k, label]) => (
-          <button key={k} type="button" className="button" aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>
-            {t(label)}
-          </button>
-        ))}
-      </nav>
-
-      {!data ? (
-        loadError ? (
-          <p role="alert" className="error">
-            {t('dashError')}
-          </p>
-        ) : (
-          <p role="status">{t('loading')}</p>
-        )
-      ) : (
-        <>
-          {tab === 'polls' && <PollsTab code={code} data={data} reload={reload} />}
-          {tab === 'projects' && <ProjectsTab code={code} data={data} reload={reload} />}
-          {tab === 'codes' && <CodesTab code={code} data={data} reload={reload} />}
-          <p className="hint">
-            {t('mAutoRefresh')}
-            {updated && ` ${t('updatedAt')}: ${updated.toLocaleTimeString(lang === 'hu' ? 'hu-HU' : 'en-GB')}.`}
-          </p>
-          {loadError && (
+    <div className="workspace">
+      <GlassSidebar items={items} active={tab} onSelect={setTab} title={t('sbMaster')} subtitle={t('mTitle')} logoutLabel={t('mLogout')} onLogout={onLogout} />
+      <div className="wcontent">
+        {!data ? (
+          loadError ? (
             <p role="alert" className="error">
               {t('dashError')}
             </p>
-          )}
-        </>
-      )}
-    </>
+          ) : (
+            <p role="status">{t('loading')}</p>
+          )
+        ) : (
+          <>
+            {(tab === 'polls' || tab === 'projects' || tab === 'codes') && <h1>{t(heading[tab])}</h1>}
+            {tab === 'polls' && <PollsTab code={code} data={data} reload={reload} />}
+            {tab === 'planner' && (
+              <PollPlanner
+                projects={data.projects}
+                submit={(p) => masterPost<CreatedPoll>(code, 'poll.create', { ...p })}
+                onCreated={() => void reload()}
+              />
+            )}
+            {tab === 'links' && <LinksTab data={data} />}
+            {tab === 'stats' && <StatsTab data={data} />}
+            {tab === 'projects' && <ProjectsTab code={code} data={data} reload={reload} />}
+            {tab === 'codes' && <CodesTab code={code} data={data} reload={reload} />}
+            <p className="hint">
+              {t('mAutoRefresh')}
+              {updated && ` ${t('updatedAt')}: ${updated.toLocaleTimeString(lang === 'hu' ? 'hu-HU' : 'en-GB')}.`}
+            </p>
+            {loadError && (
+              <p role="alert" className="error">
+                {t('dashError')}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

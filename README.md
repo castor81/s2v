@@ -2,7 +2,7 @@
 
 QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokumentáció: projektprofil v1.0, G2 követelmény-alapvonal v1.1, G3 architektúra v1.1.
 
-**Állapot:** 2. iteráció, 4. rész (v0.5.1) · 2026-11-03
+**Állapot:** 2. iteráció, 4. rész (v0.6.0) · 2026-11-27
 
 ## Mi van benne (1. iteráció)
 
@@ -51,12 +51,14 @@ BASE_URL=https://s2vote.vercel.app GATE_CODE=... npm run loadtest   # 300 szavaz
 - A 30 napos törlés (`purge_closed_polls`) ütemezése (n8n) a 2. iteráció következő részében kerül be. A soha le nem zárt, zárási időpont nélküli szavazás nem törlődik automatikusan: érdemes zárási időpontot megadni.
 
 
-## Master felület (v0.5.1)
+## Master felület (v0.6.0)
 
 Cím: `/master` (belépés a `MASTER_CODE` kóddal; a kód csak a böngészőlap munkamenetében marad meg).
 
 - **Szavazások:** futó, betervezett és lezárt szavazások eredményekkel, szűrés (állapot, projekt, keresés), rendezés, archiválás, CSV-export.
 - **Szerkeszthetőség:** a nyitás előtti szavazás teljesen módosítható; a futó szavazás nem (csak lezárható); lezárt újranyitható vagy törölhető. Másolás sablonként, új szervezői hivatkozás elveszett link esetére.
 - **Projektek:** szavazások csoportosítása, projektenkénti export.
-- **Szerkesztői kódok:** tetszőleges számú kód (egyedi vagy generált), projekthez köthető, lejárattal, kikapcsolható; csak a sózott lenyomat tárolódik. Az általános `CREATE_GATE_CODE` továbbra is érvényes.
+- **Szerkesztői kódok:** tetszőleges számú kód (egyedi vagy generált), projekthez köthető, lejárattal, kikapcsolható; csak a sózott lenyomat tárolódik. A kódok **pontosan 8 számjegyűek** (a belépő felület szóközt/kötőjelet elfogad), a szerkesztői belépés (`/uj`) lakat-alakú számkód-oldal; téves próbálkozásnál IP-alapú zárolás (8/perc). Az általános `CREATE_GATE_CODE` (betűs) már csak API-n át érvényes; a belépő felületen nem, a master saját szavazástervezővel rendelkezik.
+
+**UI (v0.6.0):** HU/EN kapcsoló (billenő switch), oldalsó üveghatású (glassmorphic) menüsáv a szerkesztői és a master felületen (Szavazástervező, QR-kódok és linkek, Statisztika, Projektek, Szerkesztői kódok), forgó NKE-logó a belépőpanel alatt (`prefers-reduced-motion` esetén statikus).
 - Adatbázis: a `0003_master.sql` az `s2v_projects` és `s2v_access_codes` táblákat hozza létre (a közös KM-dev projektben más alkalmazás is használ `projects` nevű táblát).

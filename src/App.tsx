@@ -1,6 +1,7 @@
 import { Link, Route, Routes, useLocation } from 'react-router-dom';
 import { useLang } from './i18n';
-import { CreatePoll } from './pages/CreatePoll';
+import { EditorPage } from './pages/EditorPage';
+import { LangSwitch } from './components/LangSwitch';
 import { VotePage } from './pages/VotePage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MasterPage } from './pages/MasterPage';
@@ -30,8 +31,10 @@ function NotFound() {
 }
 
 export function App() {
-  const { lang, setLang, t } = useLang();
-  const wide = useLocation().pathname.startsWith('/master');
+  const { t } = useLang();
+  const path = useLocation().pathname;
+  const wide = path.startsWith('/master');
+  const workspace = wide || path === '/uj';
   return (
     <div className={wide ? 'shell wide' : 'shell'}>
       <header className="topbar">
@@ -42,25 +45,12 @@ export function App() {
             <span className="brand-sub">{t('orgName')}</span>
           </span>
         </Link>
-        <div role="group" aria-label={t('language')} className="langswitch">
-          {(['hu', 'en'] as const).map((l) => (
-            <button
-              key={l}
-              type="button"
-              className={l === lang ? 'active' : ''}
-              aria-pressed={l === lang}
-              lang={l}
-              onClick={() => setLang(l)}
-            >
-              {l.toUpperCase()}
-            </button>
-          ))}
-        </div>
+        <LangSwitch />
       </header>
-      <main id="main">
+      <main id="main" className={workspace ? 'flat' : undefined}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/uj" element={<CreatePoll />} />
+          <Route path="/uj" element={<EditorPage />} />
           <Route path="/o/:token" element={<DashboardPage />} />
           <Route path="/master" element={<MasterPage />} />
           <Route path="/:slug" element={<VotePage />} />

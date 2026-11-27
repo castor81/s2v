@@ -77,7 +77,7 @@ export function CodesTab({ code, data, reload }: Props) {
         </div>
         <div className="field">
           <label htmlFor="m-ccode">{t('mCodeCustom')}</label>
-          <input id="m-ccode" maxLength={64} autoComplete="off" spellCheck={false} value={custom} onChange={(e) => setCustom(e.target.value)} aria-describedby="m-ccode-h" />
+          <input id="m-ccode" inputMode="numeric" pattern="[0-9 ]*" maxLength={9} autoComplete="off" spellCheck={false} value={custom} onChange={(e) => setCustom(e.target.value)} aria-describedby="m-ccode-h" />
           <span className="hint" id="m-ccode-h">
             {t('mCodeCustomHint')}
           </span>
@@ -118,7 +118,7 @@ export function CodesTab({ code, data, reload }: Props) {
           <p>
             {t('mCodeIssued')} <strong>{issued.label}</strong>
           </p>
-          <CopyField id="m-issued-code" label={t('mCodeValue')} value={issued.code} />
+          <CopyField id="m-issued-code" label={t('mCodeValue')} value={`${issued.code.slice(0, 4)} ${issued.code.slice(4)}`} />
           <p>{t('mCodeIssuedWarn')}</p>
           <button type="button" className="button" onClick={() => setIssued(null)}>
             {t('mDismiss')}

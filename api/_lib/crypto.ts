@@ -39,10 +39,10 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ha, hb);
 }
 
-// Szerkesztői kód: félreérthető karakterek nélkül, 3×4 jegy kötőjellel (kb. 58 bit).
-const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+// Szerkesztői kód: 8 számjegy (a belépő oldalon számbillentyűzettel beírható). 10^8 lehetőség,
+// a találgatást a sikertelen próbák IP-zárolása (create.ts) teszi járhatatlanná.
+export const ACCESS_CODE_DIGITS = 8;
 
 export function generateAccessCode(): string {
-  const group = () => Array.from({ length: 4 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join('');
-  return `${group()}-${group()}-${group()}`;
+  return String(randomInt(10 ** ACCESS_CODE_DIGITS)).padStart(ACCESS_CODE_DIGITS, '0');
 }

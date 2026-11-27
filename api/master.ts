@@ -4,13 +4,13 @@ import { generateAccessCode, generateToken, safeEqual, sha256Hex } from './_lib/
 import { hashAccessCode, validateAccessCode } from './_lib/codes.js';
 import { insertPoll } from './_lib/pollCreate.js';
 import { planEdit } from './_lib/pollEdit.js';
-import { effectiveStatus, validateSchedule, type PollOption } from './_lib/validate.js';
+import { effectiveStatus, validateCreate, validateSchedule, type PollOption } from './_lib/validate.js';
 
 // POST /api/master  { masterCode, action, ...adatok }
 // A master felület egyetlen végpontja (egy szerver nélküli függvény). Minden kérés a master kóddal
 // hitelesít; a kód a MASTER_CODE környezeti változóban van, a kliens csak a böngésző munkamenetében őrzi.
 //
-// Műveletek: overview · poll.update · poll.meta · poll.status · poll.delete · poll.copy · poll.newToken ·
+// Műveletek: overview · poll.create · poll.update · poll.meta · poll.status · poll.delete · poll.copy · poll.newToken ·
 //            project.create · project.rename · project.delete · code.create · code.update · code.delete
 
 const RETENTION_DAYS = 30; // a lezárt szavazások megőrzése (A1), megegyezik a purge_closed_polls alapértékével
@@ -204,6 +204,27 @@ async function pollDelete(body: Body): Promise<Reply> {
   return ok();
 }
 
+async function pollCreate(body: Body): Promise<Reply> {
+  const parsed = validateCreate(body);
+  if (!parsed.ok) return fail(400, parsed.error);
+  const s = validateSchedule({ opensAt: body.opensAt, closesAt: body.closesAt });
+  if (!s.ok) return fail(400, s.error);
+  const rawProject = body.projectId ?? null;
+  const pe = await checkProject(rawProject);
+  if (pe) return pe;
+  const projectId = rawProject as string | null; // checkProject: null vagy érvényes azonosító
+  const created = await insertPoll({
+    title: parsed.value.title,
+    options: parsed.value.options,
+    opensAt: s.value.opensAt,
+    closesAt: s.value.closesAt,
+    projectId,
+    codeId: null,
+  });
+  if (!created.ok) return fail(500, created.error);
+  return ok({ slug: created.slug, voteUrl: created.voteUrl, organizerUrl: created.organizerUrl }, 201);
+}
+
 async function pollCopy(body: Body): Promise<Reply> {
   const l = await loadPoll(body.id);
   if (l.reply) return l.reply;
@@ -282,7 +303,8 @@ async function codeCreate(body: Body): Promise<Reply> {
   if (!label) return fail(400, 'label_invalid');
 
   let code: string;
-  if (body.code === undefined || body.code === null || body.code === '') {
+  const generated = body.code === undefined || body.code === null || body.code === '';
+  if (generated) {
     code = generateAccessCode();
   } else {
     const v = validateAccessCode(body.code);
@@ -301,18 +323,24 @@ async function codeCreate(body: Body): Promise<Reply> {
   if (!exp.ok) return fail(400, 'expiry_invalid');
   if (exp.value && Date.parse(exp.value) <= Date.now()) return fail(400, 'expiry_past');
 
-  const { data, error } = await db()
-    .from('s2v_access_codes')
-    .insert({ label, code_hash: hashAccessCode(code), project_id: projectId, expires_at: exp.value })
-    .select('id')
-    .single();
-  if (error) {
-    if (error.code === '23505') return fail(409, 'code_taken');
-    console.error('master: code create failed', error.code, error.message);
-    return serverError();
+  // Generált kód ütközésénél (ritka) újat sorsolunk; megadott kód ütközése hiba.
+  for (let attempt = 0; attempt < (generated ? 5 : 1); attempt++) {
+    if (attempt > 0) code = generateAccessCode();
+    const { data, error } = await db()
+      .from('s2v_access_codes')
+      .insert({ label, code_hash: hashAccessCode(code), project_id: projectId, expires_at: exp.value })
+      .select('id')
+      .single();
+    if (!error) {
+      // A kód csak most látszik; az adatbázisban csak a lenyomata van.
+      return ok({ id: data?.id, code }, 201);
+    }
+    if (error.code !== '23505') {
+      console.error('master: code create failed', error.code, error.message);
+      return serverError();
+    }
   }
-  // A kód csak most látszik; az adatbázisban csak a lenyomata van.
-  return ok({ id: data?.id, code }, 201);
+  return fail(409, 'code_taken');
 }
 
 async function codeUpdate(body: Body): Promise<Reply> {
@@ -365,6 +393,7 @@ const ACTIONS: Record<string, (b: Body) => Promise<Reply>> = {
   'poll.meta': pollMeta,
   'poll.status': pollStatus,
   'poll.delete': pollDelete,
+  'poll.create': pollCreate,
   'poll.copy': pollCopy,
   'poll.newToken': pollNewToken,
   'project.create': projectCreate,

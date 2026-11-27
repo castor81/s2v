@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { guard, send } from './_lib/http.js';
+import { guard, limitReached, rateLimited, send } from './_lib/http.js';
 import { resolveGateCode } from './_lib/codes.js';
 import { insertPoll } from './_lib/pollCreate.js';
 import { validateCreate, validateSchedule } from './_lib/validate.js';
 
 // POST /api/create  { gateCode, title: {hu,en}, options: [{hu,en}, ...], opensAt?, closesAt? }
 // → { slug, voteUrl, organizerUrl }   (a szervezői link csak most jelenik meg, később nem kérhető le)
-// A belépési kód lehet az általános (környezeti) kód vagy a master felületen kezelt kódtár egy kódja;
+// A belépési kód lehet az általános (környezeti) kód vagy a master felületen kezelt 8 jegyű számkód;
 // a projekthez kötött kód a szavazást a saját projektjébe teszi.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // A belépési kód találgatása ellen szigorúbb korlát (kérés/perc/IP).
@@ -15,8 +15,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const body: unknown = req.body;
     const gate = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).gateCode : undefined;
-    const access = await resolveGateCode(gate);
-    if (!access) return send(res, 401, { error: 'invalid_gate_code' });
+    // Találgatás ellen: 8 sikertelen próba után az IP-t percre zároljuk (a helyes kód is 429-et kap).
+    if (limitReached(req, 'gatefail', 8)) {
+      res.setHeader('Retry-After', '60');
+      return send(res, 429, { error: 'rate_limited' });
+    }
+    const checkOnly = typeof body === 'object' && body !== null && (body as Record<string, unknown>).check === true;
+    const access = await resolveGateCode(gate, { count: !checkOnly });
+    if (!access) {
+      rateLimited(req, 'gatefail', 8);
+      return send(res, 401, { error: 'invalid_gate_code' });
+    }
+    // Belépő oldal: csak a kód érvényességét ellenőrizzük, szavazás nem jön létre.
+    if (checkOnly) return send(res, 200, { ok: true, projectName: access.projectName });
 
     const parsed = validateCreate(body);
     if (!parsed.ok) return send(res, 400, { error: parsed.error });

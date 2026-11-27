@@ -227,38 +227,39 @@ test('project: létrehozás, névütközés (kis-nagybetű nélkül), átnevezé
 
 // ---------------- kódtár és létrehozás ----------------
 
-test('code.create: generált kód 3×4 formátumú, csak a lenyomata tárolódik', async () => {
+test('code.create: generált kód 8 számjegy, csak a lenyomata tárolódik', async () => {
   const r = await m('code.create', { label: 'Hallgatói önkormányzat' });
   assert.equal(r.code, 201);
-  assert.match(r.body.code, /^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.match(r.body.code, /^\d{8}$/);
   const row = tables.s2v_access_codes[0];
   assert.equal(row.code_hash, hashAccessCode(r.body.code));
   assert.ok(!JSON.stringify(row).includes(r.body.code));
 });
 
 test('code.create: egyedi kód szabályai (hossz, szóköz, ütközés, általános kóddal azonos, lejárat)', async () => {
-  assert.equal((await m('code.create', { label: 'x', code: 'rövid' })).body.error, 'code_too_short');
-  assert.equal((await m('code.create', { label: 'x', code: 'van benne szóköz' })).body.error, 'code_invalid');
-  assert.equal((await m('code.create', { label: '', code: 'hosszu-kod-123' })).body.error, 'label_invalid');
-  assert.equal((await m('code.create', { label: 'x', code: 'gate-secret' })).body.error, 'code_taken');
-  assert.equal((await m('code.create', { label: 'x', code: 'hosszu-kod-123', expiresAt: inDays(-1) })).body.error, 'expiry_past');
-  assert.equal((await m('code.create', { label: 'x', code: 'hosszu-kod-123', expiresAt: 'nem-datum' })).body.error, 'expiry_invalid');
-  assert.equal((await m('code.create', { label: 'x', code: 'hosszu-kod-123' })).code, 201);
-  assert.equal((await m('code.create', { label: 'y', code: 'hosszu-kod-123' })).body.error, 'code_taken');
+  assert.equal((await m('code.create', { label: 'x', code: '1234' })).body.error, 'code_invalid');
+  assert.equal((await m('code.create', { label: 'x', code: 'betukkel1' })).body.error, 'code_invalid');
+  assert.equal((await m('code.create', { label: 'x', code: '123456789' })).body.error, 'code_invalid');
+  assert.equal((await m('code.create', { label: '', code: '12345678' })).body.error, 'label_invalid');
+  assert.equal((await m('code.create', { label: 'x', code: 'gate-secret' })).body.error, 'code_invalid');
+  assert.equal((await m('code.create', { label: 'x', code: '12345678', expiresAt: inDays(-1) })).body.error, 'expiry_past');
+  assert.equal((await m('code.create', { label: 'x', code: '12345678', expiresAt: 'nem-datum' })).body.error, 'expiry_invalid');
+  assert.equal((await m('code.create', { label: 'x', code: '1234 5678' })).code, 201);
+  assert.equal((await m('code.create', { label: 'y', code: '12345678' })).body.error, 'code_taken');
 });
 
 test('create: a kódtár kódja működik, projekthez kötött kód a projektbe teszi a szavazást, számlál', async () => {
   const proj = await m('project.create', { name: 'Konferencia' });
-  const generic = await m('code.create', { label: 'Általános', code: 'altalanos-kod-1' });
-  await m('code.create', { label: 'Konferencia', code: 'konferencia-kod-1', projectId: proj.body.id });
+  const generic = await m('code.create', { label: 'Általános', code: '11111111' });
+  await m('code.create', { label: 'Konferencia', code: '22222222', projectId: proj.body.id });
   const body = { title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] };
   const ip = '10.3.0.1';
 
-  assert.equal((await call(create, { ...body, gateCode: 'altalanos-kod-1' }, ip)).code, 201);
+  assert.equal((await call(create, { ...body, gateCode: '11111111' }, ip)).code, 201);
   assert.equal(tables.polls[0].project_id, null);
   assert.equal(tables.polls[0].code_id, generic.body.id);
 
-  assert.equal((await call(create, { ...body, gateCode: 'konferencia-kod-1' }, ip)).code, 201);
+  assert.equal((await call(create, { ...body, gateCode: '22222222' }, ip)).code, 201);
   assert.equal(tables.polls[1].project_id, proj.body.id);
   assert.equal(tables.s2v_access_codes[1].use_count, 1);
   assert.ok(tables.s2v_access_codes[1].last_used_at);
@@ -267,12 +268,12 @@ test('create: a kódtár kódja működik, projekthez kötött kód a projektbe 
   assert.equal((await call(create, { ...body, gateCode: 'gate-secret' }, ip)).code, 201);
   assert.equal(tables.polls[2].project_id, null);
   assert.equal(tables.polls[2].code_id, null);
-  assert.equal((await call(create, { ...body, gateCode: 'ismeretlen-kod' }, ip)).code, 401);
+  assert.equal((await call(create, { ...body, gateCode: '99999999' }, ip)).code, 401);
 });
 
 test('create: kikapcsolt és lejárt kód elutasítva; a lejárat beállítása azonnal hat', async () => {
-  const c = await m('code.create', { label: 'K', code: 'ideiglenes-kod-1' });
-  const body = { gateCode: 'ideiglenes-kod-1', title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] };
+  const c = await m('code.create', { label: 'K', code: '33333333' });
+  const body = { gateCode: '33333333', title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] };
   const ip = '10.3.0.2';
   assert.equal((await call(create, body, ip)).code, 201);
 
@@ -286,18 +287,59 @@ test('create: kikapcsolt és lejárt kód elutasítva; a lejárat beállítása 
 });
 
 test('code.delete: a kód megszűnik, a vele létrehozott szavazás megmarad', async () => {
-  const c = await m('code.create', { label: 'K', code: 'torlendo-kod-1' });
+  const c = await m('code.create', { label: 'K', code: '44444444' });
   const { poll } = addPoll({ code_id: c.body.id });
   assert.equal((await m('code.delete', { id: c.body.id })).code, 200);
   assert.equal(tables.s2v_access_codes.length, 0);
   assert.equal(poll.code_id, null);
-  const r = await call(create, { gateCode: 'torlendo-kod-1', title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] }, '10.3.0.3');
+  const r = await call(create, { gateCode: '44444444', title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] }, '10.3.0.3');
   assert.equal(r.code, 401);
 });
 
 test('segédek: kódgenerátor és kódellenőrzés', () => {
-  assert.match(generateAccessCode(), /^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  assert.match(generateAccessCode(), /^\d{8}$/);
   assert.notEqual(generateAccessCode(), generateAccessCode());
-  assert.equal(validateAccessCode('  hosszu-kod-1  ').ok, true);
+  assert.equal(validateAccessCode('  1234-5678 ').ok, true);
+  assert.equal(validateAccessCode('1234567').ok, false);
+  assert.equal(validateAccessCode('abcd1234').ok, false);
   assert.notEqual(hashAccessCode('a'), hashAccessCode('b'));
+});
+
+test('create: belépő ellenőrzés (check) nem hoz létre szavazást és nem számlál; szóközös/kötőjeles kód is jó', async () => {
+  const proj = await m('project.create', { name: 'Hétvége' });
+  await m('code.create', { label: 'K', code: '55556666', projectId: proj.body.id });
+  const ip = '10.4.0.1';
+  const r = await call(create, { gateCode: '5555 6666', check: true }, ip);
+  assert.equal(r.code, 200);
+  assert.equal(r.body.projectName, 'Hétvége');
+  assert.equal(tables.polls.length, 0);
+  assert.equal(tables.s2v_access_codes[0].use_count, 0);
+  assert.equal((await call(create, { gateCode: '5555-6666', title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] }, ip)).code, 201);
+  assert.equal(tables.s2v_access_codes[0].use_count, 1);
+});
+
+test('create: 8 sikertelen kód után az IP zárolva (még a helyes kód is 429)', async () => {
+  await m('code.create', { label: 'K', code: '77778888' });
+  const ip = '10.4.0.2';
+  for (let i = 0; i < 8; i++) assert.equal((await call(create, { gateCode: '00000000', check: true }, ip)).code, 401);
+  assert.equal((await call(create, { gateCode: '77778888', check: true }, ip)).code, 429);
+  assert.equal((await call(create, { gateCode: '77778888', check: true }, '10.4.0.3')).code, 200);
+});
+
+test('poll.create: a master kód nélkül hoz létre szavazást, projekttel és időzítéssel', async () => {
+  const proj = await m('project.create', { name: 'Konf' });
+  const opens = inDays(7);
+  const r = await m('poll.create', {
+    title: { hu: 'Terv' },
+    options: [{ hu: 'a' }, { hu: 'b' }],
+    opensAt: opens,
+    closesAt: new Date(Date.parse(opens) + 3_600_000).toISOString(),
+    projectId: proj.body.id,
+  });
+  assert.equal(r.code, 201);
+  assert.match(r.body.organizerUrl, /\/o\/[A-Za-z0-9_-]{43}$/);
+  assert.equal(tables.polls[0].project_id, proj.body.id);
+  assert.equal(tables.polls[0].opens_at, opens);
+  assert.equal((await m('poll.create', { title: { hu: 'x' }, options: [{ hu: 'a' }] })).code, 400);
+  assert.equal((await m('poll.create', { title: { hu: 'x' }, options: [{ hu: 'a' }, { hu: 'b' }], projectId: '00000000-0000-4000-8000-00000000ffff' })).body.error, 'project_not_found');
 });
