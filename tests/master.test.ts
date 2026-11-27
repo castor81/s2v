@@ -25,7 +25,7 @@ const OPTS = [
 let tables: Tables;
 let ipCounter = 0;
 beforeEach(() => {
-  tables = { polls: [], votes: [], poll_sessions: [], s2v_projects: [], s2v_access_codes: [], s2v_audit_log: [] };
+  tables = { polls: [], votes: [], poll_sessions: [], s2v_projects: [], s2v_access_codes: [], s2v_audit_log: [], s2v_tech_hits: [], s2v_tech_errors: [] };
   __setDbForTests(makeFakeDb(tables));
 });
 
@@ -466,4 +466,85 @@ test('audit.list: legfrissebb elöl, időszűrés; a naplót csak a master/direk
   assert.deepEqual(some.body.entries.map((e: Row) => e.projectName), ['B']);
   assert.equal((await m('audit.list', {}, 'rossz-kod')).code, 401);
   assert.equal((await m('audit.list', { from: 'nem-datum' })).code, 400);
+});
+
+// ---- Technikai lefolyás (hívások, hibák) ----
+import vote from '../api/vote.js';
+import openPoll from '../api/open.js';
+import live from '../api/live.js';
+import { __flushTechForTests } from '../api/_lib/tech.js';
+
+test('technikai napló: hívások kimenet szerint (ok, már szavazott, korlát), hibák üzenettel; a buffer kiírható', async () => {
+  const created = await m('poll.create', { title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] });
+  const slug = created.body.slug as string;
+  const dev = (n: number) => 'd'.repeat(10) + String(n).padStart(10, '0');
+  const optionId = ((tables.polls[0] as Row).options as Row[])[0].id;
+  const ip = '10.7.0.1';
+  assert.equal((await call(openPoll, { slug, deviceId: dev(1) }, ip)).code, 200);
+  assert.equal((await call(vote, { slug, deviceId: dev(1), optionId }, ip)).code, 200);
+  assert.equal((await call(vote, { slug, deviceId: dev(1), optionId }, ip)).code, 409); // már szavazott
+  assert.equal((await call(live, { slug, deviceId: dev(1) }, ip)).code, 200);
+  assert.equal((await call(live, { slug, deviceId: dev(1) }, ip)).code, 200);
+  assert.equal((await call(openPoll, { slug: 'zzzzz9', deviceId: dev(2) }, ip)).code, 404);
+  await __flushTechForTests();
+
+  const r = await m('tech.list');
+  assert.equal(r.code, 200);
+  const hits = r.body.hits as Row[];
+  const get = (endpoint: string, outcome: string) => hits.find((h) => h.endpoint === endpoint && h.outcome === outcome && h.pollSlug === slug);
+  assert.equal(get('open', 'ok')?.n, 1);
+  assert.equal(get('vote', 'ok')?.n, 1);
+  assert.equal(get('vote', 'already_voted')?.n, 1);
+  assert.equal(get('live', 'ok')?.n, 2);
+  assert.equal(hits.find((h) => h.endpoint === 'open' && h.outcome === 'not_found')?.pollSlug, 'zzzzz9');
+  assert.ok(Number(get('vote', 'ok')?.msMax) >= 0);
+  // nincs személyes adat: eszközazonosító nem szerepel a naplóban
+  assert.equal(JSON.stringify(tables.s2v_tech_hits).includes(dev(1)), false);
+});
+
+test('technikai napló: szerveroldali hiba egyenként, üzenettel és szavazással', async () => {
+  const created = await m('poll.create', { title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] });
+  const slug = created.body.slug as string;
+  const optionId = ((tables.polls[0] as Row).options as Row[])[0].id;
+  // a szavazat-beszúrás meghibásodik (nem egyediségi hiba)
+  const real = tables.votes;
+  const base = makeFakeDb(tables);
+  __setDbForTests({
+    ...base,
+    from: (t: string) => {
+      const q: any = base.from(t);
+      if (t === 'votes') q.insert = () => ({ select: () => q, then: (a: any) => Promise.resolve({ data: null, error: { code: 'XX000', message: 'boom' } }).then(a) });
+      return q;
+    },
+  });
+  const r = await call(vote, { slug, deviceId: 'e'.repeat(20), optionId }, '10.7.0.2');
+  __setDbForTests(makeFakeDb(tables));
+  tables.votes = real;
+  assert.equal(r.code, 500);
+  const errs = tables.s2v_tech_errors as Row[];
+  assert.equal(errs.length, 1);
+  assert.equal(errs[0].endpoint, 'vote');
+  assert.equal(errs[0].status, 500);
+  assert.equal(errs[0].poll_slug, slug);
+  assert.match(String(errs[0].message), /vote: insert failed.*boom/);
+  const l = await m('tech.list');
+  assert.equal(l.body.errors.length, 1);
+  assert.equal((l.body.hits as Row[]).find((h) => h.endpoint === 'vote' && h.outcome === 'server_error')?.n, 1);
+});
+
+test('technikai napló: a korlátozott (429) hívás is megjelenik a szavazásnál (slug a kérésből)', async () => {
+  const created = await m('poll.create', { title: { hu: 'T' }, options: [{ hu: 'a' }, { hu: 'b' }] });
+  const slug = created.body.slug as string;
+  const old = process.env.RATE_LIMIT_PER_MIN;
+  process.env.RATE_LIMIT_PER_MIN = '1';
+  try {
+    const ip = '10.7.0.3';
+    await call(openPoll, { slug, deviceId: 'f'.repeat(20) }, ip);
+    assert.equal((await call(openPoll, { slug, deviceId: 'f'.repeat(20) }, ip)).code, 429);
+  } finally {
+    if (old === undefined) delete process.env.RATE_LIMIT_PER_MIN;
+    else process.env.RATE_LIMIT_PER_MIN = old;
+  }
+  const hits = (await m('tech.list')).body.hits as Row[];
+  assert.equal(hits.find((h) => h.outcome === 'rate_limited')?.pollSlug, slug);
 });

@@ -54,6 +54,28 @@ export interface AuditEntry {
   detail: Record<string, unknown> | null;
 }
 
+export interface TechHit {
+  bucket: string;
+  pollSlug: string | null;
+  pollId: string | null;
+  endpoint: string;
+  outcome: string;
+  n: number;
+  msSum: number;
+  msMax: number;
+}
+
+export interface TechError {
+  id: string;
+  at: string;
+  pollId: string | null;
+  pollSlug: string | null;
+  endpoint: string;
+  status: number;
+  error: string | null;
+  message: string | null;
+}
+
 export interface Overview {
   now: string;
   retentionDays: number;

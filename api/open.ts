@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { attachPoll, logError, tracked } from './_lib/tech.js';
 import { db, guard, requireEnv, send } from './_lib/http.js';
 import { hashDevice } from './_lib/crypto.js';
 import { effectiveStatus, isDeviceId, isSlug } from './_lib/validate.js';
@@ -6,7 +7,7 @@ import { effectiveStatus, isDeviceId, isSlug } from './_lib/validate.js';
 // POST /api/open  { slug, deviceId }
 // A szavazóoldal betöltésekor hívja a kliens: visszaadja a szavazást, és session-t rögzít
 // (leadási arány és idő a szavazatig mérőszámokhoz). GET helyett POST, mert van mellékhatása.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default tracked('open', async (req: VercelRequest, res: VercelResponse) => {
   if (guard(req, res, 'open')) return;
 
   try {
@@ -19,10 +20,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('slug', slug)
       .maybeSingle();
     if (error) {
-      console.error('open: poll lookup failed', error.code, error.message);
+      logError(res, 'open: poll lookup failed', error.code, error.message);
       return send(res, 500, { error: 'server_error' });
     }
     if (!poll) return send(res, 404, { error: 'not_found' });
+    attachPoll(res, { id: poll.id, slug });
 
     const status = effectiveStatus(poll);
     const deviceHash = hashDevice(deviceId, requireEnv('DEVICE_SALT'));
@@ -33,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { error: upErr } = await db()
         .from('poll_sessions')
         .upsert({ poll_id: poll.id, device_hash: deviceHash }, { onConflict: 'poll_id,device_hash', ignoreDuplicates: true });
-      if (upErr) console.error('open: session upsert failed', upErr.code, upErr.message);
+      if (upErr) logError(res, 'open: session upsert failed', upErr.code, upErr.message);
     }
 
     const { data: session } = await db()
@@ -53,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       closesAt: poll.closes_at,
     });
   } catch (e) {
-    console.error('open failed', e);
+    logError(res, 'open failed', e);
     return send(res, 500, { error: 'server_error' });
   }
-}
+});

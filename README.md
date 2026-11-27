@@ -2,7 +2,7 @@
 
 QR-kódos, tét nélküli közönségszavazó webalkalmazás (NKE HHK). Dokumentáció: projektprofil v1.0, G2 követelmény-alapvonal v1.1, G3 architektúra v1.1.
 
-**Állapot:** 2. iteráció, 4. rész (v0.8.0) · 2026-11-27
+**Állapot:** 2. iteráció, 4. rész (v0.9.0) · 2026-11-27
 
 ## Mi van benne (1. iteráció)
 
@@ -51,7 +51,7 @@ BASE_URL=https://s2vote.vercel.app GATE_CODE=... npm run loadtest   # 300 szavaz
 - A 30 napos törlés (`purge_closed_polls`) ütemezése (n8n) a 2. iteráció következő részében kerül be. A soha le nem zárt, zárási időpont nélküli szavazás nem törlődik automatikusan: érdemes zárási időpontot megadni.
 
 
-## Master felület (v0.8.0)
+## Master felület (v0.9.0)
 
 Cím: `/` – közös belépő (a master a `MASTER_CODE` kóddal lép be; a kód csak a böngészőlap munkamenetében marad meg).
 
@@ -68,4 +68,9 @@ Cím: `/` – közös belépő (a master a `MASTER_CODE` kóddal lép be; a kód
 - **Direktor kód:** a `DIRECTOR_CODE` környezeti változó (Vercel, titkos) a masterrel azonos jogosultságot ad; ugyanazon a közös belépő oldalon lehet vele belépni. A napló megkülönbözteti a masteri és a direktori műveleteket. A szerkesztői kód nem lehet azonos a master vagy a direktor kóddal.
 - **Napló** (master és direktor számára, külön menüpont): időrendben, ki mit csinált. Naplózott: belépések (master, direktor, szerkesztői kód); szavazás létrehozása/módosítása/lezárása/újranyitása/áthelyezése/archiválása/törlése/másolása, új szervezői link; projekt létrehozása/átnevezése/törlése; szerkesztői kód kiadása/módosítása/be-/kikapcsolása/törlése; a szervezői linkkel végzett módosítás és lezárás (a szavazás kódjának megnevezésével). Szűrhető: felhasználó (master / direktor / szerkesztői kód), projekt, szavazás, tevékenység, időszak, szabad szöveg.
 - A napló az elemek nevét a bejegyzés pillanatában őrzi, így törlés után is olvasható. **A kódok értéke soha nem kerül a naplóba.** A bejegyzések megőrzése jelenleg korlátlan (`s2v_audit_log`, migráció: `supabase/migrations/0004_audit.sql`).
+
+## Technikai napló és lehetőség-import (v0.9.0)
+
+- **Technikai lefolyás** (Napló → „Technikai lefolyás” nézet; master és direktor): a szavazások hívásai percenkénti bontásban, végpontonként (szavazólap megnyitása, szavazat, élő állás, szervezői dashboard, szervezői módosítás/lezárás) és kimenetenként (sikeres, már szavazott, nem nyitott, sebességkorlát 429, érvénytelen kérés, szerverhiba), válaszidővel (átlag, max.), csúcsterheléssel; a szerveroldali hibák egyenként, hibaüzenettel (`s2v_tech_hits`, `s2v_tech_errors`, migráció `0005_tech.sql`). Szűrés: projekt, szavazás, időszak, „csak problémás hívások”. Személyes adat (eszköz- vagy IP-azonosító) nincs benne. Az élő állás és a dashboard sikeres hívásai memóriában összegződnek (~20 mp), ezért közelítő számok; a többi hívás azonnal kerül a naplóba.
+- **Lehetőségek importja** (szavazástervező, szerkesztő és master egyaránt): Excel (.xlsx), CSV vagy TXT fájlból (gomb vagy húzás). Az első kitöltött oszlop sorai lesznek a lehetőségek, fejléc-sor felismerve, üres/ismétlődő sor kihagyva, 80 karakterre vágva, legfeljebb 10; a már beírt lehetőségek megmaradnak. CSV: UTF-8 és Windows-1250 (magyar Excel), `;` `,` tab határoló. Feldolgozás a böngészőben (a fájl nem kerül a szerverre); az xlsx-olvasó (fflate) csak az első xlsx-importkor töltődik be. A régi `.xls` nem támogatott (mentse .xlsx-ként). Minta CSV letölthető.
 

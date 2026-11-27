@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { attachPoll, logError, tracked } from './_lib/tech.js';
 import { db, guard, send } from './_lib/http.js';
 import { sha256Hex } from './_lib/crypto.js';
 import { effectiveStatus, isToken, type PollOption } from './_lib/validate.js';
@@ -9,7 +10,7 @@ const MAX_ROWS = 5000; // ≤300 egyidejű szavazónál bőven elég; a Supabase
 // POST /api/results  { token }
 // A szervezői token alapján adja vissza a szavazást és az eredményeket (F7). A tokent a
 // szerver csak hash-ként ismeri; érvénytelen token ugyanazt a 404-et kapja, mint a nem létező.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default tracked('results', async (req: VercelRequest, res: VercelResponse) => {
   // A dashboard 5 mp-enként frissít; a korlát magasabb, mert egy IP mögött több szervező is lehet.
   if (guard(req, res, 'results', 300)) return;
 
@@ -23,17 +24,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('organizer_token_hash', sha256Hex(token))
       .maybeSingle();
     if (error) {
-      console.error('results: poll lookup failed', error.code, error.message);
+      logError(res, 'results: poll lookup failed', error.code, error.message);
       return send(res, 500, { error: 'server_error' });
     }
     if (!poll) return send(res, 404, { error: 'not_found' });
+    attachPoll(res, { id: poll.id, slug: poll.slug });
 
     const [votes, sessions] = await Promise.all([
       db().from('votes').select('option_id').eq('poll_id', poll.id).range(0, MAX_ROWS - 1),
       db().from('poll_sessions').select('first_seen_at, voted_at').eq('poll_id', poll.id).range(0, MAX_ROWS - 1),
     ]);
     if (votes.error || sessions.error) {
-      console.error('results: stats query failed', votes.error?.code, sessions.error?.code);
+      logError(res, 'results: stats query failed', votes.error?.code, sessions.error?.code);
       return send(res, 500, { error: 'server_error' });
     }
 
@@ -58,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       stats,
     });
   } catch (e) {
-    console.error('results failed', e);
+    logError(res, 'results failed', e);
     return send(res, 500, { error: 'server_error' });
   }
-}
+});

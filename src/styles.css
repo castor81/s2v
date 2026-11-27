@@ -991,3 +991,21 @@ input[type='search'] {
   font-size: 1rem;
   text-transform: capitalize;
 }
+.stat.warn {
+  border-color: #b4442b;
+}
+.stat.warn dd {
+  color: #8c2f19;
+}
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.inline-check input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+  padding: 0;
+}

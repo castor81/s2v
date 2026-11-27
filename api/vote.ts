@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { attachPoll, logError, tracked } from './_lib/tech.js';
 import { db, guard, requireEnv, send } from './_lib/http.js';
 import { hashDevice } from './_lib/crypto.js';
 import { effectiveStatus, isDeviceId, isSlug, type PollOption } from './_lib/validate.js';
@@ -6,7 +7,7 @@ import { effectiveStatus, isDeviceId, isSlug, type PollOption } from './_lib/val
 // POST /api/vote  { slug, deviceId, optionId }
 // Eszközönként egy szavazat szavazásonként: az adatbázis UNIQUE (poll_id, device_hash) megszorítása
 // dönt, így párhuzamos kéréseknél sem lehet duplikátum.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default tracked('vote', async (req: VercelRequest, res: VercelResponse) => {
   if (guard(req, res, 'vote')) return;
 
   try {
@@ -21,10 +22,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('slug', slug)
       .maybeSingle();
     if (error) {
-      console.error('vote: poll lookup failed', error.code, error.message);
+      logError(res, 'vote: poll lookup failed', error.code, error.message);
       return send(res, 500, { error: 'server_error' });
     }
     if (!poll) return send(res, 404, { error: 'not_found' });
+    attachPoll(res, { id: poll.id, slug });
 
     if (effectiveStatus(poll) !== 'open') return send(res, 409, { error: 'not_open' });
     if (!(poll.options as PollOption[]).some((o) => o.id === optionId)) {
@@ -37,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .insert({ poll_id: poll.id, option_id: optionId, device_hash: deviceHash });
     if (voteErr) {
       if (voteErr.code === '23505') return send(res, 409, { error: 'already_voted' });
-      console.error('vote: insert failed', voteErr.code, voteErr.message);
+      logError(res, 'vote: insert failed', voteErr.code, voteErr.message);
       return send(res, 500, { error: 'server_error' });
     }
 
@@ -48,11 +50,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { poll_id: poll.id, device_hash: deviceHash, voted_at: new Date().toISOString() },
         { onConflict: 'poll_id,device_hash' },
       );
-    if (sessErr) console.error('vote: session update failed', sessErr.code, sessErr.message);
+    if (sessErr) logError(res, 'vote: session update failed', sessErr.code, sessErr.message);
 
     return send(res, 200, { ok: true });
   } catch (e) {
-    console.error('vote failed', e);
+    logError(res, 'vote failed', e);
     return send(res, 500, { error: 'server_error' });
   }
-}
+});

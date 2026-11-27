@@ -10,6 +10,9 @@ const UNIQUE: Record<string, string[]> = {
   s2v_projects: ['name'],
 };
 
+// Összetett egyediség: szavazatonként egy eszköz (poll_id, device_hash).
+const UNIQUE_COMPOSITE: Record<string, string[][]> = { votes: [['poll_id', 'device_hash']] };
+
 // Az adatbázis oszlop-alapértékei.
 const DEFAULTS: Record<string, Row> = { s2v_access_codes: { active: true, use_count: 0, last_used_at: null, expires_at: null, project_id: null } };
 
@@ -65,6 +68,18 @@ class Q implements PromiseLike<any> {
     this.op = 'delete';
     return this;
   }
+  /** Beszúrás vagy (ütközésnél) összefésülés / kihagyás az onConflict oszlopok szerint. */
+  upsert(r: Row, o?: { onConflict?: string; ignoreDuplicates?: boolean }) {
+    const rows = (this.tables[this.table] ??= []);
+    const cols = (o?.onConflict ?? 'id').split(',');
+    const existing = rows.find((x) => cols.every((c) => x[c] === r[c]));
+    if (existing) {
+      if (!o?.ignoreDuplicates) Object.assign(existing, r);
+      return Promise.resolve({ data: null, error: null });
+    }
+    rows.push({ id: randomUUID(), ...r });
+    return Promise.resolve({ data: null, error: null });
+  }
   maybeSingle() {
     return Promise.resolve(this.run(true));
   }
@@ -87,7 +102,10 @@ class Q implements PromiseLike<any> {
         );
         if (dup) return { data: null, error: { code: '23505', message: 'duplicate' } };
       }
-      const row = { id: randomUUID(), ...(DEFAULTS[this.table] ?? {}), ...(this.table === 's2v_audit_log' ? { at: new Date().toISOString() } : {}), ...this.patch };
+      for (const cols of UNIQUE_COMPOSITE[this.table] ?? []) {
+        if (rows.some((r) => cols.every((c) => r[c] === this.patch[c]))) return { data: null, error: { code: '23505', message: 'duplicate' } };
+      }
+      const row = { id: randomUUID(), ...(DEFAULTS[this.table] ?? {}), ...(this.table === 's2v_audit_log' || this.table === 's2v_tech_errors' ? { at: new Date().toISOString() } : {}), ...this.patch };
       rows.push(row);
       return { data: single ? row : [row], error: null };
     }
@@ -128,7 +146,20 @@ export function makeFakeDb(tables: Tables) {
   return {
     from: (t: string) => new Q(tables, t),
     // master_poll_counts(): szavazásonként szavazat, munkamenet és opciónkénti bontás
-    rpc: (name: string) => {
+    rpc: (name: string, args?: Row) => {
+      if (name === 's2v_tech_hit' && args) {
+        // percenként összegző növelés (mint az adatbázis-függvény)
+        const rows = (tables.s2v_tech_hits ??= []);
+        const bucket = new Date(Math.floor(Date.now() / 60_000) * 60_000).toISOString();
+        const key = args.p_slug ?? '';
+        let r = rows.find((x) => x.bucket === bucket && x.poll_key === key && x.endpoint === args.p_endpoint && x.outcome === args.p_outcome);
+        if (!r) rows.push((r = { bucket, poll_key: key, poll_id: args.p_poll_id ?? null, endpoint: args.p_endpoint, outcome: args.p_outcome, n: 0, ms_sum: 0, ms_max: 0 }));
+        r.n += args.p_n;
+        r.ms_sum += args.p_ms_sum;
+        r.ms_max = Math.max(r.ms_max, args.p_ms_max);
+        r.poll_id ??= args.p_poll_id ?? null;
+        return Promise.resolve({ data: null, error: null });
+      }
       if (name !== 'master_poll_counts') return Promise.resolve({ data: null, error: { code: 'x', message: 'unknown rpc' } });
       const data = (tables.polls ?? []).map((p) => {
         const votes = (tables.votes ?? []).filter((v) => v.poll_id === p.id);

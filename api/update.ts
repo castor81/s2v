@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { attachPoll, logError, tracked } from './_lib/tech.js';
 import { db, guard, send } from './_lib/http.js';
 import { sha256Hex } from './_lib/crypto.js';
 import { effectiveStatus, isToken } from './_lib/validate.js';
@@ -11,7 +12,7 @@ import { auditOrganizer } from './_lib/audit.js';
 //  - nyitott szavazásnál: csak a zárás időpontja (meghosszabbítás/rövidítés/törlés);
 //  - lezárt szavazásnál semmi (újranyitás: /api/status).
 // A mezők jelenléte számít: hiányzó mező = nem módosul, null = törlés (azonnal / kézi zárás).
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default tracked('update', async (req: VercelRequest, res: VercelResponse) => {
   if (guard(req, res, 'update', 60)) return;
 
   try {
@@ -24,10 +25,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('organizer_token_hash', sha256Hex(body.token))
       .maybeSingle();
     if (error) {
-      console.error('update: poll lookup failed', error.code, error.message);
+      logError(res, 'update: poll lookup failed', error.code, error.message);
       return send(res, 500, { error: 'server_error' });
     }
     if (!poll) return send(res, 404, { error: 'not_found' });
+    attachPoll(res, { id: poll.id, slug: poll.slug });
 
     const plan = await planEdit(poll, body, { allowCloseWhenOpen: true });
     if (!plan.ok) return send(res, plan.status, { error: plan.error });
@@ -39,13 +41,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select('status, opens_at, closes_at')
       .maybeSingle();
     if (upErr || !data) {
-      console.error('update failed', upErr?.code, upErr?.message);
+      logError(res, 'update failed', upErr?.code, upErr?.message);
       return send(res, 500, { error: 'server_error' });
     }
     await auditOrganizer(poll, 'poll.update', { fields: Object.keys(plan.patch) });
     return send(res, 200, { status: effectiveStatus(data), opensAt: data.opens_at, closesAt: data.closes_at });
   } catch (e) {
-    console.error('update failed', e);
+    logError(res, 'update failed', e);
     return send(res, 500, { error: 'server_error' });
   }
-}
+});

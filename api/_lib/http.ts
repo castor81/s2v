@@ -22,6 +22,8 @@ export function __setDbForTests(c: unknown): void {
 }
 
 export function send(res: VercelResponse, status: number, body: unknown): void {
+  // A technikai napló (tech.ts) innen tudja a válasz állapotát és hibakódát.
+  (res as { __s2vOut?: unknown }).__s2vOut = { status, error: (body as { error?: string } | null)?.error };
   res.status(status).json(body);
 }
 

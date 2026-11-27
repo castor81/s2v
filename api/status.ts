@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { attachPoll, logError, tracked } from './_lib/tech.js';
 import { db, guard, send } from './_lib/http.js';
 import { sha256Hex } from './_lib/crypto.js';
 import { effectiveStatus, isToken } from './_lib/validate.js';
@@ -8,7 +9,7 @@ import { auditOrganizer } from './_lib/audit.js';
 // A szervező lezárhatja vagy újranyithatja a szavazást (F4). A lezárás rögzíti a closed_at
 // időpontot (innen számít a 30 napos megőrzés); az újranyitás törli azt és az időablakot is,
 // hogy a kézi döntés felülírja a korábbi nyitási/zárási időpontokat.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default tracked('status', async (req: VercelRequest, res: VercelResponse) => {
   if (guard(req, res, 'status', 60)) return;
 
   try {
@@ -29,15 +30,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select('id, slug, title, code_id, project_id, status, opens_at, closes_at')
       .maybeSingle();
     if (error) {
-      console.error('status: update failed', error.code, error.message);
+      logError(res, 'status: update failed', error.code, error.message);
       return send(res, 500, { error: 'server_error' });
     }
     if (!data) return send(res, 404, { error: 'not_found' });
+    attachPoll(res, { id: data.id, slug: data.slug });
 
     await auditOrganizer(data, action === 'close' ? 'poll.close' : 'poll.reopen');
     return send(res, 200, { status: effectiveStatus(data) });
   } catch (e) {
-    console.error('status failed', e);
+    logError(res, 'status failed', e);
     return send(res, 500, { error: 'server_error' });
   }
-}
+});

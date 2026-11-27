@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { attachPoll, logError, noteError, tracked } from './_lib/tech.js';
 import { db, guard, requireEnv, send } from './_lib/http.js';
 import { hashDevice } from './_lib/crypto.js';
 import { effectiveStatus, isDeviceId, isSlug, type EffectiveStatus, type PollOption } from './_lib/validate.js';
@@ -63,7 +64,7 @@ async function snapshot(slug: string): Promise<Snapshot | null | 'error'> {
 // A szavazók élő állása: csak az az eszköz kapja meg, amelyről már szavaztak ebben a szavazásban
 // (az eredmény így nem befolyásolja a szavazat leadását). A szervezői mérőszámokat (megnyitások,
 // leadási arány, idők) nem tartalmazza, azok csak a szervezői tokennel érhetők el.
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default tracked('live', async (req: VercelRequest, res: VercelResponse) => {
   // Saját kosár: a gyakori frissítés nem fogyasztja el a megnyitás/szavazás korlátját.
   if (guard(req, res, 'live', Number(process.env.RATE_LIMIT_LIVE_PER_MIN ?? 3000))) return;
 
@@ -72,8 +73,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!isSlug(slug) || !isDeviceId(deviceId)) return send(res, 400, { error: 'invalid_request' });
 
     const snap = await snapshot(slug);
-    if (snap === 'error') return send(res, 500, { error: 'server_error' });
+    if (snap === 'error') {
+      noteError(res, 'live: snapshot failed');
+      return send(res, 500, { error: 'server_error' });
+    }
     if (!snap) return send(res, 404, { error: 'not_found' });
+    attachPoll(res, { id: snap.id, slug });
 
     const deviceHash = hashDevice(deviceId, requireEnv('DEVICE_SALT'));
     const { data: mine, error } = await db()
@@ -83,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('device_hash', deviceHash)
       .maybeSingle();
     if (error) {
-      console.error('live: own vote lookup failed', error.code);
+      logError(res, 'live: own vote lookup failed', error.code);
       return send(res, 500, { error: 'server_error' });
     }
     if (!mine) return send(res, 403, { error: 'vote_first' });
@@ -97,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       votes: snap.votes,
     });
   } catch (e) {
-    console.error('live failed', e);
+    logError(res, 'live failed', e);
     return send(res, 500, { error: 'server_error' });
   }
-}
+});

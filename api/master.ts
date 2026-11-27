@@ -11,7 +11,7 @@ import { effectiveStatus, validateCreate, validateSchedule, type PollOption } fr
 // A master felület egyetlen végpontja (egy szerver nélküli függvény). Minden kérés a master kóddal
 // hitelesít; a kód a MASTER_CODE környezeti változóban van, a kliens csak a böngésző munkamenetében őrzi.
 //
-// Műveletek: overview · audit.list · poll.create · poll.update · poll.meta · poll.status · poll.delete · poll.copy · poll.newToken ·
+// Műveletek: overview · audit.list · tech.list · poll.create · poll.update · poll.meta · poll.status · poll.delete · poll.copy · poll.newToken ·
 //            project.create · project.rename · project.delete · code.create · code.update · code.delete
 
 const RETENTION_DAYS = 30; // a lezárt szavazások megőrzése (A1), megegyezik a purge_closed_polls alapértékével
@@ -335,6 +335,65 @@ async function auditList(body: Body): Promise<Reply> {
   return ok({ entries, truncated: rows.length > AUDIT_MAX });
 }
 
+// ---------------- technikai napló ----------------
+
+const TECH_HITS_MAX = 5000;
+const TECH_ERRORS_MAX = 500;
+
+/** A szavazások technikai lefolyása: percenkénti hívásszámok és a szerveroldali hibák (időszűréssel). */
+async function techList(body: Body): Promise<Reply> {
+  const from = parseInstantOrNull(body.from);
+  const to = parseInstantOrNull(body.to);
+  if (!from.ok || !to.ok) return fail(400, 'invalid_request');
+  let hq = db()
+    .from('s2v_tech_hits')
+    .select('bucket, poll_key, poll_id, endpoint, outcome, n, ms_sum, ms_max')
+    .order('bucket', { ascending: false });
+  let eq = db()
+    .from('s2v_tech_errors')
+    .select('id, at, poll_id, poll_slug, endpoint, status, error, message')
+    .order('at', { ascending: false });
+  if (from.value) {
+    hq = hq.gte('bucket', from.value);
+    eq = eq.gte('at', from.value);
+  }
+  if (to.value) {
+    hq = hq.lte('bucket', to.value);
+    eq = eq.lte('at', to.value);
+  }
+  const [h, e] = await Promise.all([hq.limit(TECH_HITS_MAX + 1), eq.limit(TECH_ERRORS_MAX + 1)]);
+  if (h.error || e.error) {
+    console.error('master: tech list failed', h.error?.code, e.error?.code);
+    return serverError();
+  }
+  const hits = h.data ?? [];
+  const errors = e.data ?? [];
+  return ok({
+    hits: hits.slice(0, TECH_HITS_MAX).map((r) => ({
+      bucket: r.bucket,
+      pollSlug: r.poll_key || null,
+      pollId: r.poll_id,
+      endpoint: r.endpoint,
+      outcome: r.outcome,
+      n: Number(r.n),
+      msSum: Number(r.ms_sum),
+      msMax: Number(r.ms_max),
+    })),
+    errors: errors.slice(0, TECH_ERRORS_MAX).map((r) => ({
+      id: r.id,
+      at: r.at,
+      pollId: r.poll_id,
+      pollSlug: r.poll_slug,
+      endpoint: r.endpoint,
+      status: r.status,
+      error: r.error,
+      message: r.message,
+    })),
+    hitsTruncated: hits.length > TECH_HITS_MAX,
+    errorsTruncated: errors.length > TECH_ERRORS_MAX,
+  });
+}
+
 // ---------------- kódtár ----------------
 
 async function codeCreate(body: Body): Promise<Reply> {
@@ -446,6 +505,7 @@ const ACTIONS: Record<string, (b: Body) => Promise<Reply>> = {
   'code.update': codeUpdate,
   'code.delete': codeDelete,
   'audit.list': auditList,
+  'tech.list': techList,
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

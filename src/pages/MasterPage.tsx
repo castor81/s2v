@@ -8,7 +8,7 @@ import { StatsTab } from '../components/master/StatsTab';
 import { PollsTab } from '../components/master/PollsTab';
 import { ProjectsTab } from '../components/master/ProjectsTab';
 import { CodesTab } from '../components/master/CodesTab';
-import { AuditTab } from '../components/master/AuditTab';
+import { LogTab } from '../components/master/LogTab';
 
 type Tab = 'polls' | 'planner' | 'links' | 'stats' | 'projects' | 'codes' | 'audit';
 const REFRESH_MS = 5000;
@@ -105,7 +105,7 @@ export function MasterPage({ code, role, onLogout }: { code: string; role: 'mast
             {tab === 'stats' && <StatsTab data={data} />}
             {tab === 'projects' && <ProjectsTab code={code} data={data} reload={reload} />}
             {tab === 'codes' && <CodesTab code={code} data={data} reload={reload} />}
-            {tab === 'audit' && <AuditTab code={code} />}
+            {tab === 'audit' && <LogTab code={code} data={data} />}
             <p className="hint">
               {t('mAutoRefresh')}
               {updated && ` ${t('updatedAt')}: ${updated.toLocaleTimeString(lang === 'hu' ? 'hu-HU' : 'en-GB')}.`}
